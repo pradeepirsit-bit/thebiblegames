@@ -14,6 +14,15 @@
             to { opacity: 1; transform: translateY(0); }
         }
         .hidden { display: none !important; }
+        .circular-grid { 
+            display: grid; 
+            gap: 2px; 
+            justify-content: center; 
+            background: #fff; 
+            padding: 20px; 
+            border-radius: 50%;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col selection:bg-indigo-100 selection:text-indigo-900">
@@ -53,33 +62,39 @@
                     <div class="text-xs text-slate-500 mt-1">Completely blank grids.</div>
                 </button>
             </div>
-            <button onclick="startGame()" class="w-full py-4 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800 transition-all active:scale-95">Begin Level 1</button>
+            <button onclick="startGame()" class="w-full py-4 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800 transition-all active:scale-95">Begin Level <span id="btn-level-num">1</span></button>
         </section>
 
         <section id="screen-playing" class="w-full hidden fade-in">
-            <div id="wordsearch-container" class="hidden w-full max-w-4xl mx-auto flex flex-col items-center"></div>
+            <div id="api-loading" class="hidden w-full p-12 text-center text-indigo-600 font-bold animate-pulse text-lg">
+                Fetching dynamic scripture via Bible-API...
+            </div>
+
+            <div id="wordsearch-container" class="hidden w-full max-w-5xl mx-auto flex flex-col items-center"></div>
             
             <div id="svg-game-container" class="hidden w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div class="lg:col-span-8 bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 min-h-[500px] flex flex-col">
                    <div class="flex justify-between items-center mb-6">
                        <div>
-                           <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Theme</span>
+                           <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Theme / Reference</span>
                            <h2 id="game-theme" class="text-lg font-bold text-slate-900"></h2>
                        </div>
                        <span id="game-level-badge" class="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-semibold uppercase"></span>
                    </div>
-                   <div id="board-container" class="flex-grow flex items-center justify-center select-none w-full overflow-auto"></div>
+                   <div id="game-context" class="mb-4 text-sm text-slate-600 italic font-medium"></div>
+                   
+                   <div id="board-container" class="flex-grow flex items-center justify-center select-none w-full overflow-auto py-8"></div>
                    <div id="validation-error" class="hidden mt-4 p-4 bg-red-50 text-red-600 text-sm font-medium rounded-xl text-center"></div>
                 </div>
                 
                 <div class="lg:col-span-4 flex flex-col space-y-4 h-full">
-                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex-grow">
-                        <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Clues</h3>
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex-grow max-h-[500px] overflow-y-auto">
+                        <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Clues & Target Words</h3>
                         <div id="clues-container" class="space-y-2"></div>
                     </div>
                     <div class="flex flex-col space-y-2">
                         <button onclick="verifyAnswers()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-2xl active:scale-95 transition-all">Check Answers</button>
-                        <button onclick="showAnswers()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-2xl active:scale-95 transition-all">Show Answers</button>
+                        <button onclick="showAnswers()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-2xl active:scale-95 transition-all">Show Answers (Skip to Next)</button>
                     </div>
                 </div>
             </div>
@@ -87,7 +102,7 @@
 
         <section id="screen-success" class="w-full max-w-md hidden fade-in text-center bg-white p-10 rounded-3xl shadow-md border border-slate-200/60">
             <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">✓</div>
-            <h2 class="text-3xl font-bold text-slate-900 mb-3">Level Cleared!</h2>
+            <h2 class="text-3xl font-bold text-slate-900 mb-3">Level <span id="success-level-num"></span> Cleared!</h2>
             
             <div id="success-scripture" class="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8 mt-6">
                 <span class="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">Decoded Scripture</span>
@@ -103,32 +118,35 @@
     </main>
 
     <script>
-        const DB = {
-            brick: { easy: [{ level: 1, theme: "Proverbs 3:5", verse: "TRUST IN THE LORD WITH ALL YOUR HEART", clues: [{ id: 1, text: "Firm belief in the reliability or truth of someone", answer: "TRUST" }, { id: 2, text: "Preposition indicating inclusion or location", answer: "IN" }, { id: 3, text: "The supreme being; God", answer: "LORD" }], grid: [{ wordIdx: 0, row: 0, startCol: 1, length: 5 }, { wordIdx: 1, row: 0, startCol: 7, length: 2 }, { wordIdx: 2, row: 1, startCol: 3, length: 4 }] }] },
-            radial: { easy: [{ level: 1, theme: "Fruit of the Spirit", verse: "LOVE JOY PEACE", rings: 3, sectors: 8, clues: [{ id: 1, text: "The greatest theological virtue (Galatians 5:22)", answer: "LOVE", ring: 0 }, { id: 2, text: "Gladdening emotion or delight", answer: "JOY", ring: 1 }, { id: 3, text: "Tranquility; absence of conflict", answer: "PEACE", ring: 2 }] }] },
-            spiral: { easy: [{ level: 1, theme: "The Path of Creation", verse: "LIGHTADAMEVEGARDEN", clues: [{ id: 1, text: "Created on Day 1 ('Let there be...')", answer: "LIGHT", startIdx: 0 }, { id: 2, text: "The first man", answer: "ADAM", startIdx: 5 }, { id: 3, text: "The first woman", answer: "EVE", startIdx: 9 }, { id: 4, text: "The paradise home: _____ of Eden", answer: "GARDEN", startIdx: 12 }] }] }
+        // API References Pool
+        const API_VERSE_REFS = [
+            "John 3:16", "Genesis 1:1", "Psalm 23:1", "Romans 8:28", "Philippians 4:13", 
+            "Proverbs 3:5", "Isaiah 40:31", "Matthew 28:19", "Jeremiah 29:11", "Ephesians 2:8", 
+            "Hebrews 11:1", "James 1:5", "Psalm 119:105", "Galatians 5:22"
+        ];
+
+        // Static fallback for Spiral (since it requires a continuous narrative string)
+        const SPIRAL_DB = {
+            easy: [{ level: 1, theme: "The Path of Creation", verse: "LIGHTADAMEVEGARDEN", clues: [{ id: 1, text: "Created on Day 1", answer: "LIGHT", startIdx: 0 }, { id: 2, text: "The first man", answer: "ADAM", startIdx: 5 }, { id: 3, text: "The first woman", answer: "EVE", startIdx: 9 }, { id: 4, text: "Paradise home", answer: "GARDEN", startIdx: 12 }] }]
         };
 
-        const WORD_BANK = ["GOD", "ARK", "SIN", "LOVE", "HOPE", "FAITH", "JESUS", "MOSES", "DAVID", "GRACE", "BIBLE", "ANGEL", "PEACE", "GLORY", "CROSS"];
-        
-        // Verses for API to pick from randomly
-        const API_VERSE_REFS = ["John 3:16", "Genesis 1:1", "Psalm 23:1", "Romans 8:28", "Philippians 4:13", "Proverbs 3:5", "Isaiah 40:31", "Matthew 28:19", "Jeremiah 29:11", "Ephesians 2:8", "Hebrews 11:1", "James 1:5"];
-
         const CATALOG = [
-            { id: 'brick', title: 'Masonry Quotes', sub: 'Staggered Brick Grids', desc: 'Rebuild scriptures stone by stone.', icon: '🧱' },
-            { id: 'radial', title: 'Concentric Rings', sub: 'Radial Trivia', desc: 'Solve Bible trivia in expanding circles.', icon: '🎯' },
-            { id: 'spiral', title: 'Scripture Spiral', sub: 'Continuous Pathways', desc: 'Wind your way through biblical timelines.', icon: '🌀' },
-            { id: 'wordsearch', title: 'Infinite Word Search', sub: 'Procedural Generation', desc: 'Find biblical words fetched automatically via API.', icon: '🔍' }
+            { id: 'brick', title: 'Masonry Quotes', sub: 'Staggered Brick Grids', desc: 'Rebuild dynamic API scriptures stone by stone.', icon: '🧱' },
+            { id: 'radial', title: 'Concentric Rings', sub: 'Radial Trivia', desc: 'Solve API Bible words in expanding circles.', icon: '🎯' },
+            { id: 'spiral', title: 'Scripture Spiral', sub: 'Colorful Pathways', desc: 'Wind your way through vibrant, color-coded timelines.', icon: '🌀' },
+            { id: 'wordsearch', title: 'Circular Word Search', sub: 'Massive Procedural Generation', desc: 'Find 20-100 words in a massive circular polar grid.', icon: '🔍' }
         ];
 
         let State = {
-            screen: 'home', shape: '', difficulty: 'easy', level: 1, puzzle: null, inputs: {}, selectedCell: null, selectedClue: null,
+            screen: 'home', shape: '', difficulty: 'easy', level: 1, puzzle: null, inputs: {}, 
+            selectedCell: null, selectedClue: null, usedShowAnswers: false,
             ws: { grid: [], words: [], found: [], startCell: null, size: 5, apiRef: '', apiVerse: '' }
         };
 
         const screens = ['home', 'setup', 'playing', 'success'].map(s => document.getElementById(`screen-${s}`));
         const hiddenInput = document.getElementById('hidden-input');
 
+        // Init UI
         document.getElementById('game-catalog').innerHTML = CATALOG.map(g => `
             <div onclick="selectGame('${g.id}')" class="group bg-white rounded-3xl p-8 border border-slate-200/60 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all duration-300 cursor-pointer flex flex-col active:scale-95">
                 <div class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">${g.icon}</div>
@@ -157,44 +175,99 @@
             document.getElementById('btn-diff-hard').className = diff === 'hard' ? 'p-5 rounded-2xl border-2 text-left border-slate-900 bg-slate-50' : 'p-5 rounded-2xl border-2 text-left border-slate-100 hover:border-slate-300';
         }
 
-        function startGame() { State.level = 1; loadLevel(); }
-        function nextLevel() { State.level++; loadLevel(); }
+        function startGame() { State.level = 1; document.getElementById('btn-level-num').innerText = State.level; loadLevel(); }
+        function nextLevel() { State.level++; document.getElementById('btn-level-num').innerText = State.level; loadLevel(); }
 
-        function loadLevel() {
+        // Core Game Loader
+        async function loadLevel() {
             switchScreen('playing');
+            State.usedShowAnswers = false;
             document.getElementById('validation-error').classList.add('hidden');
+            document.getElementById('wordsearch-container').classList.add('hidden');
+            document.getElementById('svg-game-container').classList.add('hidden');
+            document.getElementById('api-loading').classList.remove('hidden');
             
             if (State.shape === 'wordsearch') {
-                document.getElementById('svg-game-container').classList.add('hidden');
+                await generateWordSearch();
+                document.getElementById('api-loading').classList.add('hidden');
                 document.getElementById('wordsearch-container').classList.remove('hidden');
-                generateWordSearch();
+            } else if (State.shape === 'spiral') {
+                // Static load for spiral
+                State.puzzle = SPIRAL_DB.easy[0];
+                setupSVGGame();
             } else {
-                document.getElementById('wordsearch-container').classList.add('hidden');
-                document.getElementById('svg-game-container').classList.remove('hidden');
-                
-                const shapeData = DB[State.shape]?.[State.difficulty] || DB[State.shape]?.['easy'];
-                State.puzzle = shapeData.find(p => p.level === State.level) || shapeData[0];
-                
-                document.getElementById('game-theme').innerText = State.puzzle.theme;
-                document.getElementById('game-level-badge').innerText = `Level ${State.level}`;
-                
-                State.inputs = {};
-                State.selectedCell = null;
-                State.selectedClue = State.puzzle.clues[0].id;
-                
-                if (State.shape === 'brick') {
-                    State.puzzle.grid.forEach(w => { for (let i = 0; i < w.length; i++) State.inputs[`b-${w.row}-${w.startCol + i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.clues[w.wordIdx].answer[0] : ''; });
-                }
-                renderSVGBoard();
-                renderClues();
+                // Dynamic API Load for Brick and Radial
+                await generateDynamicPuzzle(State.shape);
+                setupSVGGame();
             }
         }
 
-        function handleCellClick(key) {
-            State.selectedCell = key;
-            renderSVGBoard();
-            hiddenInput.focus();
+        // ======================================================================
+        // DYNAMIC API DATA GENERATION (Brick & Radial)
+        // ======================================================================
+        async function generateDynamicPuzzle(shape) {
+            const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
+            let verse = "GOD CREATED THE HEAVENS AND THE EARTH"; // fallback
+            
+            try {
+                const res = await fetch(`https://bible-api.com/${ref}`);
+                const data = await res.json();
+                verse = data.text.trim().replace(/[^a-zA-Z\s]/g, '').toUpperCase();
+            } catch (e) { console.log("API fallback used."); }
+
+            let words = verse.split(/\s+/).filter(w => w.length > 2);
+            if (words.length > 10) words = words.slice(0, 10); // cap size for grid
+
+            let clues = words.map((w, i) => ({ id: i+1, text: `Word from passage: ${w}`, answer: w }));
+
+            let puzzle = { theme: ref, verse: verse, fullText: verse, clues: clues };
+
+            if (shape === 'brick') {
+                let grid = [];
+                let row = 0, colOffset = 0;
+                words.forEach((w, i) => {
+                    if (colOffset + w.length > 12) { row++; colOffset = 0; }
+                    grid.push({ wordIdx: i, row: row, startCol: colOffset, length: w.length });
+                    colOffset += w.length + 1; // space between bricks
+                });
+                puzzle.grid = grid;
+            } else if (shape === 'radial') {
+                clues.forEach((c, i) => { c.ring = i % 3; }); // Assign to 3 concentric rings
+                puzzle.sectors = 12; // Base sectors
+            }
+
+            State.puzzle = puzzle;
         }
+
+        function setupSVGGame() {
+            document.getElementById('api-loading').classList.add('hidden');
+            document.getElementById('svg-game-container').classList.remove('hidden');
+            
+            document.getElementById('game-theme').innerText = State.puzzle.theme;
+            document.getElementById('game-level-badge').innerText = `Level ${State.level}`;
+            document.getElementById('game-context').innerText = State.puzzle.fullText ? `"${State.puzzle.fullText}"` : "";
+            
+            State.inputs = {};
+            State.selectedCell = null;
+            State.selectedClue = State.puzzle.clues[0]?.id;
+            
+            // Guided mode prefill
+            if (State.shape === 'brick') {
+                State.puzzle.grid.forEach(w => { for (let i = 0; i < w.length; i++) State.inputs[`b-${w.row}-${w.startCol + i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.clues[w.wordIdx].answer[0] : ''; });
+            } else if (State.shape === 'radial') {
+                State.puzzle.clues.forEach(c => { for (let i = 0; i < c.answer.length; i++) State.inputs[`r-${c.ring}-${i}`] = (State.difficulty === 'easy' && i === 0) ? c.answer[0] : ''; });
+            } else if (State.shape === 'spiral') {
+                State.puzzle.clues.forEach(c => { for (let i = 0; i < c.answer.length; i++) State.inputs[`s-${c.startIdx + i}`] = (State.difficulty === 'easy' && i === 0) ? c.answer[0] : ''; });
+            }
+            
+            renderSVGBoard();
+            renderClues();
+        }
+
+        // ======================================================================
+        // INPUT AND RENDERING
+        // ======================================================================
+        function handleCellClick(key) { State.selectedCell = key; renderSVGBoard(); hiddenInput.focus(); }
 
         hiddenInput.addEventListener('input', (e) => {
             if (!State.selectedCell) return;
@@ -204,16 +277,12 @@
         });
 
         function renderClues() {
-            const container = document.getElementById('clues-container');
-            container.innerHTML = State.puzzle.clues.map(c => {
-                // NEW FEATURE: Add word length to Scripture Spiral (and others)
+            document.getElementById('clues-container').innerHTML = State.puzzle.clues.map(c => {
                 let clueText = c.text;
-                if (State.shape === 'spiral') {
-                    clueText += ` <span class="text-indigo-500 font-bold">(${c.answer.length} letters)</span>`;
-                }
-
+                // Feature: Add word lengths to Spiral (and others)
+                clueText += ` <span class="text-indigo-500 font-bold">(${c.answer.length} letters)</span>`;
                 return `
-                <div onclick="State.selectedClue = ${c.id}; renderClues();" class="p-4 rounded-2xl cursor-pointer border ${State.selectedClue === c.id ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-transparent border-transparent hover:bg-slate-50 text-slate-600'} transition-colors">
+                <div onclick="State.selectedClue = ${c.id}; renderClues();" class="p-3 rounded-xl cursor-pointer border ${State.selectedClue === c.id ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-transparent border-transparent hover:bg-slate-50 text-slate-600'} transition-colors">
                     <p class="text-sm font-medium"><strong>${c.id}.</strong> ${clueText}</p>
                 </div>
             `}).join('');
@@ -224,23 +293,62 @@
             let svgHTML = '';
 
             if (State.shape === 'brick') {
-                const w = 540, h = 440, bw = 48, bh = 54;
+                const w = 600, h = 500, bw = 40, bh = 46;
                 let rects = '';
                 State.puzzle.grid.forEach(word => {
                     for (let i = 0; i < word.length; i++) {
-                        const col = word.startCol + i, x = col * bw + (word.row % 2 * (bw / 2)) + 30, y = word.row * bh + 60;
+                        const col = word.startCol + i, x = col * bw + (word.row % 2 * (bw / 2)) + 20, y = word.row * bh + 20;
                         const key = `b-${word.row}-${col}`, isSel = State.selectedCell === key, val = State.inputs[key] || '';
                         rects += `
                             <g onclick="handleCellClick('${key}')" class="cursor-pointer">
-                                <rect x="${x}" y="${y}" width="${bw-4}" height="${bh-4}" rx="6" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2.5 : 1.5}" />
-                                <text x="${x + (bw/2) - 2}" y="${y + (bh/2) + 6}" text-anchor="middle" class="font-bold text-xl pointer-events-none" fill="#0f172a">${val}</text>
+                                <rect x="${x}" y="${y}" width="${bw-4}" height="${bh-4}" rx="4" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2 : 1}" />
+                                <text x="${x + (bw/2) - 2}" y="${y + (bh/2) + 5}" text-anchor="middle" class="font-bold text-lg pointer-events-none" fill="#0f172a">${val}</text>
                             </g>
                         `;
                     }
                 });
-                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 60vh;">${rects}</svg>`;
+                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 50vh;">${rects}</svg>`;
             } 
+            else if (State.shape === 'radial') {
+                // Feature: Restored Concentric Rings UI
+                const w = 500, h = 500, cx = w/2, cy = h/2;
+                let paths = '';
+                State.puzzle.clues.forEach(c => {
+                    const innerR = 60 + c.ring * 45; const outerR = innerR + 40;
+                    const angleStep = 360 / (c.answer.length + (c.answer.length%2===0?2:3)); // ensure gaps
+                    
+                    for(let i=0; i<c.answer.length; i++) {
+                        const startA = i * angleStep - 90; const endA = startA + angleStep - 2;
+                        const rS = (Math.PI * startA) / 180; const rE = (Math.PI * endA) / 180;
+                        
+                        const pData = `M ${cx + innerR * Math.cos(rS)} ${cy + innerR * Math.sin(rS)} 
+                                       L ${cx + outerR * Math.cos(rS)} ${cy + outerR * Math.sin(rS)} 
+                                       A ${outerR} ${outerR} 0 0 1 ${cx + outerR * Math.cos(rE)} ${cy + outerR * Math.sin(rE)} 
+                                       L ${cx + innerR * Math.cos(rE)} ${cy + innerR * Math.sin(rE)} 
+                                       A ${innerR} ${innerR} 0 0 0 ${cx + innerR * Math.cos(rS)} ${cy + innerR * Math.sin(rS)} Z`;
+                        
+                        const key = `r-${c.ring}-${i}`, isSel = State.selectedCell === key, val = State.inputs[key] || '';
+                        
+                        const tRad = (Math.PI * (startA + angleStep / 2)) / 180;
+                        const tx = cx + ((innerR + outerR) / 2) * Math.cos(tRad);
+                        const ty = cy + ((innerR + outerR) / 2) * Math.sin(tRad) + 6;
+
+                        paths += `
+                            <g onclick="handleCellClick('${key}')" class="cursor-pointer">
+                                <path d="${pData}" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2 : 1}" />
+                                <text x="${tx}" y="${ty}" text-anchor="middle" class="font-bold text-lg pointer-events-none" fill="#0f172a">${val}</text>
+                            </g>
+                        `;
+                    }
+                });
+                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 50vh;">
+                    <circle cx="${cx}" cy="${cy}" r="45" fill="#0f172a" />
+                    <text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" class="text-xs font-bold tracking-widest">WORD</text>
+                    ${paths}
+                </svg>`;
+            }
             else if (State.shape === 'spiral') {
+                // Feature: Colorful Scripture Spiral
                 const w = 540, h = 440, bs = 40;
                 let rects = '';
                 for (let i = 0; i < State.puzzle.verse.length; i++) {
@@ -248,129 +356,102 @@
                     let y = i < 10 ? 0 : (i < 17 ? i - 9 : (i < 25 ? 7 : 7 - (i - 24)));
                     const xP = x * (bs + 6) + 40, yP = y * (bs + 6) + 40;
                     const key = `s-${i}`, isSel = State.selectedCell === key, val = State.inputs[key] || '';
+                    
+                    // Generate Color based on expected letter character code
+                    const charCode = State.puzzle.verse.charCodeAt(i) || 65;
+                    const hue = (charCode * 35) % 360; 
+                    const bgColor = isSel ? '#e0e7ff' : `hsl(${hue}, 80%, 90%)`;
+                    const borderColor = isSel ? '#6366f1' : `hsl(${hue}, 60%, 75%)`;
+
                     rects += `
                         <g onclick="handleCellClick('${key}')" class="cursor-pointer">
-                            <rect x="${xP}" y="${yP}" width="${bs}" height="${bs}" rx="8" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2.5 : 1.5}" />
+                            <rect x="${xP}" y="${yP}" width="${bs}" height="${bs}" rx="8" fill="${bgColor}" stroke="${borderColor}" stroke-width="${isSel ? 2.5 : 1.5}" />
                             <text x="${xP + bs/2}" y="${yP + bs/2 + 6}" text-anchor="middle" class="font-bold text-lg pointer-events-none" fill="#0f172a">${val}</text>
-                            <text x="${xP + 4}" y="${yP + 12}" class="text-[9px] fill-slate-400 pointer-events-none">${i+1}</text>
+                            <text x="${xP + 4}" y="${yP + 12}" class="text-[9px] fill-slate-500 pointer-events-none font-bold">${i+1}</text>
                         </g>
                     `;
                 }
-                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 60vh;">${rects}</svg>`;
+                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 50vh;">${rects}</svg>`;
             }
 
             container.innerHTML = svgHTML;
         }
 
-        // NEW FEATURE: Show Answers Logic
-        function showAnswers() {
-            if (State.shape === 'wordsearch') {
-                State.ws.words.forEach(w => {
-                    w.found = true;
-                    State.ws.found.push(...w.coords);
-                });
-                renderWordSearch();
-                setTimeout(triggerWin, 800);
-            } else {
-                if (State.shape === 'brick') {
-                    State.puzzle.grid.forEach(w => {
-                        const ans = State.puzzle.clues[w.wordIdx].answer;
-                        for (let i = 0; i < w.length; i++) {
-                            State.inputs[`b-${w.row}-${w.startCol + i}`] = ans[i];
-                        }
-                    });
-                } else if (State.shape === 'spiral') {
-                    for (let i = 0; i < State.puzzle.verse.length; i++) {
-                        State.inputs[`s-${i}`] = State.puzzle.verse[i];
-                    }
-                }
-                renderSVGBoard();
-                setTimeout(triggerWin, 800);
-            }
-        }
-
-        function verifyAnswers() {
-            let isValid = true;
-            if (State.shape === 'brick') {
-                State.puzzle.grid.forEach(w => {
-                    const ans = State.puzzle.clues[w.wordIdx].answer;
-                    for (let i = 0; i < w.length; i++) {
-                        if ((State.inputs[`b-${w.row}-${w.startCol + i}`] || '') !== ans[i]) isValid = false;
-                    }
-                });
-            } else if (State.shape === 'spiral') {
-                for (let i = 0; i < State.puzzle.verse.length; i++) {
-                    if ((State.inputs[`s-${i}`] || '') !== State.puzzle.verse[i]) isValid = false;
-                }
-            }
-
-            if (isValid) triggerWin();
-            else {
-                const err = document.getElementById('validation-error');
-                err.innerText = "Some letters are incorrect or missing. Keep trying!";
-                err.classList.remove('hidden');
-            }
-        }
-
-        // NEW FEATURE: Asynchronous Word Search via Bible API
+        // ======================================================================
+        // CIRCULAR INFINITE WORD SEARCH (20 - 100 Words)
+        // ======================================================================
         async function generateWordSearch() {
-            const container = document.getElementById('wordsearch-container');
-            container.innerHTML = `<div class="p-12 text-center text-indigo-600 font-bold animate-pulse text-lg">Fetching scripture from bible-api.com...</div>`;
-
-            // Pick a random verse reference to use as the question/theme
             const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
             let generatedWords = [];
             let fetchedText = "";
 
             try {
-                // Fetch live data from the API
                 const response = await fetch(`https://bible-api.com/${ref}`);
                 const data = await response.json();
                 fetchedText = data.text.trim();
-                
-                // Clean text to extract unique words
                 const cleanedStr = fetchedText.replace(/[^a-zA-Z\s]/g, '').toUpperCase();
                 generatedWords = [...new Set(cleanedStr.split(/\s+/))];
             } catch (error) {
-                console.error("API Fetch failed, using fallback", error);
                 fetchedText = "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.";
-                generatedWords = WORD_BANK;
+                generatedWords = ["GOD", "LOVE", "WORLD", "SON", "LIFE", "BELIEVE", "PERISH", "ETERNAL", "GRACE", "HOPE", "FAITH", "CROSS", "BLOOD", "MERCY", "PEACE", "SPIRIT", "HOLY", "TRUTH", "LIGHT", "GLORY", "POWER", "MIGHT", "HEAVEN", "EARTH", "ANGEL"];
             }
 
             State.ws.apiRef = ref;
             State.ws.apiVerse = fetchedText;
 
-            const size = Math.min(15, Math.max(5, Math.floor(State.level / 6) + 5));
-            const wc = Math.min(10, Math.max(3, Math.floor(State.level / 8) + 3));
+            // Feature: Scale words from 20 (lvl 1) to 100 (lvl 30)
+            const targetWords = Math.min(100, Math.max(20, 20 + Math.floor((State.level - 1) * 2.75)));
+            
+            // Calculate a grid size large enough to hold the words in a circle
+            // A circle area is ~78% of a square. We need ample room.
+            const size = Math.min(40, Math.max(16, Math.floor(Math.sqrt(targetWords * 10)))); 
             State.ws.size = size;
+            const radiusSq = Math.pow(size / 2, 2);
+            const center = size / 2 - 0.5;
             
-            let grid = Array(size).fill(null).map(() => Array(size).fill(''));
+            let grid = Array(size).fill(null).map(() => Array(size).fill(null));
             
-            // Filter the fetched API words to ensure they fit the grid length
-            let validWords = generatedWords.filter(w => w.length >= 3 && w.length <= size).sort(() => 0.5 - Math.random());
-            if (validWords.length < wc) {
-                // Fallback to static bank if verse was too short
-                validWords = validWords.concat(WORD_BANK.filter(w => w.length <= size)).slice(0, wc);
+            // Map out the circular bounds: Only cells within radius are valid ('')
+            for (let r=0; r<size; r++) {
+                for (let c=0; c<size; c++) {
+                    if (Math.pow(r - center, 2) + Math.pow(c - center, 2) <= radiusSq + 1) {
+                        grid[r][c] = ''; // valid cell
+                    }
+                }
             }
-            let words = validWords.slice(0, wc);
+
+            // Duplicate/Pad words if API didn't return enough unique ones to hit target
+            let validWords = generatedWords.filter(w => w.length >= 3 && w.length <= size);
+            while (validWords.length < targetWords) {
+                validWords = validWords.concat(validWords).slice(0, targetWords);
+            }
+            validWords = validWords.sort(() => 0.5 - Math.random());
+            let words = validWords.slice(0, targetWords);
             let placed = [];
 
-            const dirs = [[0,1], [1,0], [1,1]]; 
+            const dirs = [[0,1], [1,0], [1,1], [-1,1]]; 
             
             words.forEach(word => {
-                for(let a=0; a<100; a++) {
+                for(let a=0; a<150; a++) {
                     let [dr, dc] = dirs[Math.floor(Math.random() * dirs.length)];
                     let r = Math.floor(Math.random() * size), c = Math.floor(Math.random() * size);
                     let er = r + (word.length-1)*dr, ec = c + (word.length-1)*dc;
                     
-                    if (er < size && ec < size) {
+                    if (er >= 0 && er < size && ec >= 0 && ec < size) {
                         let canPlace = true;
                         for (let i = 0; i < word.length; i++) {
-                            if (grid[r + i*dr][c + i*dc] !== '' && grid[r + i*dr][c + i*dc] !== word[i]) { canPlace = false; break; }
+                            const cr = r + i*dr; const cc = c + i*dc;
+                            // Check if inside circle AND (empty OR matches letter)
+                            if (grid[cr][cc] === null || (grid[cr][cc] !== '' && grid[cr][cc] !== word[i])) { 
+                                canPlace = false; break; 
+                            }
                         }
                         if (canPlace) {
                             let coords = [];
-                            for (let i = 0; i < word.length; i++) { grid[r + i*dr][c + i*dc] = word[i]; coords.push(`${r+i*dr},${c+i*dc}`); }
+                            for (let i = 0; i < word.length; i++) { 
+                                grid[r + i*dr][c + i*dc] = word[i]; 
+                                coords.push(`${r+i*dr},${c+i*dc}`); 
+                            }
                             placed.push({ word, coords, found: false });
                             break;
                         }
@@ -378,8 +459,13 @@
                 }
             });
 
+            // Fill remaining valid circular cells with random letters
             const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            for (let r=0; r<size; r++) for (let c=0; c<size; c++) if (grid[r][c] === '') grid[r][c] = alpha[Math.floor(Math.random() * alpha.length)];
+            for (let r=0; r<size; r++) {
+                for (let c=0; c<size; c++) {
+                    if (grid[r][c] === '') grid[r][c] = alpha[Math.floor(Math.random() * alpha.length)];
+                }
+            }
             
             State.ws.grid = grid;
             State.ws.words = placed;
@@ -400,7 +486,10 @@
                 if (steps > 0 && (Math.abs(dr) === Math.abs(dc) || dr === 0 || dc === 0)) {
                     let str = "";
                     let rs = dr===0?0:dr/steps, cs = dc===0?0:dc/steps;
-                    for(let i=0; i<=steps; i++) str += State.ws.grid[sr + i*rs][sc + i*cs];
+                    for(let i=0; i<=steps; i++) {
+                        const cellVal = State.ws.grid[sr + i*rs]?.[sc + i*cs];
+                        if (cellVal) str += cellVal;
+                    }
                     const rev = str.split('').reverse().join('');
                     
                     const match = State.ws.words.find(w => !w.found && (w.word === str || w.word === rev));
@@ -417,39 +506,51 @@
 
         function renderWordSearch() {
             const cont = document.getElementById('wordsearch-container');
-            let gridHTML = `<div class="grid gap-1 mb-6 p-4 bg-white rounded-2xl shadow-sm border border-slate-200 w-full overflow-x-auto" style="grid-template-columns: repeat(${State.ws.size}, minmax(0, 1fr))">`;
+            
+            // Adjust cell size based on grid scale to fit screen
+            const cellW = State.ws.size > 20 ? 'w-5 h-5 text-xs' : 'w-7 h-7 md:w-8 md:h-8 text-sm md:text-base';
+            
+            // The circular-grid CSS class ensures it looks like a globe
+            let gridHTML = `<div class="circular-grid mb-6 mx-auto overflow-hidden" style="grid-template-columns: repeat(${State.ws.size}, minmax(0, 1fr))">`;
             
             for (let r=0; r<State.ws.size; r++) {
                 for (let c=0; c<State.ws.size; c++) {
+                    const char = State.ws.grid[r][c];
+                    if (char === null) {
+                        // Empty space outside the circle bounds
+                        gridHTML += `<div class="${cellW} bg-transparent"></div>`;
+                        continue;
+                    }
+
                     const isFound = State.ws.found.includes(`${r},${c}`);
                     const isAnchor = State.ws.startCell?.r === r && State.ws.startCell?.c === c;
                     
-                    let cls = "bg-slate-50 text-slate-700 border-transparent hover:ring-2 hover:ring-indigo-300";
+                    let cls = "bg-slate-50 text-slate-700 hover:ring-2 hover:ring-indigo-300";
                     if (isFound) cls = "bg-emerald-100 text-emerald-800 border-emerald-300";
-                    else if (isAnchor) cls = "bg-indigo-500 text-white border-indigo-600 shadow-md";
+                    else if (isAnchor) cls = "bg-indigo-500 text-white shadow-md";
 
-                    gridHTML += `<div onclick="wsClick(${r}, ${c})" class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-lg md:text-xl font-bold rounded-lg cursor-pointer border-2 transition-all active:scale-90 ${cls}">${State.ws.grid[r][c]}</div>`;
+                    gridHTML += `<div onclick="wsClick(${r}, ${c})" class="${cellW} flex items-center justify-center font-bold rounded-full cursor-pointer transition-all active:scale-90 ${cls}">${char}</div>`;
                 }
             }
             gridHTML += `</div>`;
             
-            let wordsHTML = `<div class="w-full bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60"><h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-100 pb-2">Words to find in passage</h3><div class="flex flex-wrap gap-2">`;
+            let wordsHTML = `<div class="w-full bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 max-h-[300px] overflow-y-auto"><h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-100 pb-2">Target Words (${State.ws.words.filter(w=>w.found).length}/${State.ws.words.length})</h3><div class="flex flex-wrap gap-1.5">`;
             State.ws.words.forEach(w => {
-                wordsHTML += `<span class="px-3 py-1.5 rounded-full text-sm font-bold ${w.found ? 'bg-slate-100 text-slate-400 line-through' : 'bg-indigo-50 text-indigo-700'}">${w.word}</span>`;
+                wordsHTML += `<span class="px-2 py-1 rounded-full text-xs font-bold ${w.found ? 'bg-slate-100 text-slate-300 line-through' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'}">${w.word}</span>`;
             });
             wordsHTML += `</div></div>`;
 
             cont.innerHTML = `
-                <div class="w-full flex justify-between items-end mb-4">
+                <div class="w-full flex justify-between items-end mb-4 px-4">
                     <div>
-                        <h2 class="text-2xl font-black text-slate-900 tracking-tight">Word Search</h2>
-                        <p class="text-sm font-semibold text-slate-500 uppercase tracking-widest">Level ${State.level} | Passage: ${State.ws.apiRef}</p>
+                        <h2 class="text-2xl font-black text-slate-900 tracking-tight">Circular Word Search</h2>
+                        <p class="text-sm font-semibold text-slate-500 uppercase tracking-widest">Level ${State.level} | ${State.ws.words.length} Words</p>
                     </div>
-                    <button onclick="showAnswers()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition-all text-sm active:scale-95">Show Answers</button>
+                    <button onclick="showAnswers()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition-all text-sm active:scale-95">Show Answers (Skip)</button>
                 </div>
                 
                 <div class="w-full mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
-                     <p class="text-sm text-indigo-900 italic font-medium leading-relaxed">"${State.ws.apiVerse}"</p>
+                     <p class="text-sm text-indigo-900 italic font-medium leading-relaxed">"${State.ws.apiVerse}" - ${State.ws.apiRef}</p>
                 </div>
 
                 ${gridHTML}
@@ -457,7 +558,76 @@
             `;
         }
 
+        // ======================================================================
+        // WIN / SKIP LOGIC
+        // ======================================================================
+        
+        // Feature: Show Answers and Skip
+        function showAnswers() {
+            State.usedShowAnswers = true;
+            if (State.shape === 'wordsearch') {
+                State.ws.words.forEach(w => { w.found = true; State.ws.found.push(...w.coords); });
+                renderWordSearch();
+                setTimeout(triggerWin, 1500); // Give user 1.5s to see the answers before skipping
+            } else {
+                if (State.shape === 'brick' || State.shape === 'radial') {
+                    State.puzzle.clues.forEach(c => {
+                        for (let i = 0; i < c.answer.length; i++) {
+                            if(State.shape === 'brick') {
+                                const wInfo = State.puzzle.grid.find(g => g.wordIdx === c.id - 1);
+                                if(wInfo) State.inputs[`b-${wInfo.row}-${wInfo.startCol + i}`] = c.answer[i];
+                            } else {
+                                State.inputs[`r-${c.ring}-${i}`] = c.answer[i];
+                            }
+                        }
+                    });
+                } else if (State.shape === 'spiral') {
+                    for (let i = 0; i < State.puzzle.verse.length; i++) State.inputs[`s-${i}`] = State.puzzle.verse[i];
+                }
+                renderSVGBoard();
+                setTimeout(triggerWin, 1500);
+            }
+        }
+
+        function verifyAnswers() {
+            let isValid = true;
+            if (State.shape === 'brick') {
+                State.puzzle.grid.forEach(w => {
+                    const ans = State.puzzle.clues[w.wordIdx].answer;
+                    for (let i = 0; i < w.length; i++) {
+                        if ((State.inputs[`b-${w.row}-${w.startCol + i}`] || '') !== ans[i]) isValid = false;
+                    }
+                });
+            } else if (State.shape === 'radial') {
+                 State.puzzle.clues.forEach(c => {
+                    for (let i = 0; i < c.answer.length; i++) {
+                        if ((State.inputs[`r-${c.ring}-${i}`] || '') !== c.answer[i]) isValid = false;
+                    }
+                });
+            } else if (State.shape === 'spiral') {
+                for (let i = 0; i < State.puzzle.verse.length; i++) {
+                    if ((State.inputs[`s-${i}`] || '') !== State.puzzle.verse[i]) isValid = false;
+                }
+            }
+
+            if (isValid) triggerWin();
+            else {
+                const err = document.getElementById('validation-error');
+                err.innerText = "Some letters are incorrect or missing. Keep trying!";
+                err.classList.remove('hidden');
+            }
+        }
+
         function triggerWin() {
+            // Feature: If they used Show Answers, do NOT show congratulations. Loop same level.
+            if (State.usedShowAnswers) {
+                State.usedShowAnswers = false;
+                loadLevel(); // Reloads fresh puzzle at current level
+                return;
+            }
+
+            // Normal Win State
+            document.getElementById('success-level-num').innerText = State.level;
             if (State.shape === 'wordsearch') {
                 document.getElementById('success-scripture').classList.add('hidden');
             } else {
