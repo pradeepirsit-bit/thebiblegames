@@ -46,7 +46,7 @@
                 <h2 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-5 tracking-tight">Engage the Word. <br> Break the Grid.</h2>
                 <p class="text-lg text-slate-500 font-medium leading-relaxed">Choose a geometric format below to test your knowledge in new ways.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" id="game-catalog"></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="game-catalog"></div>
         </section>
 
         <section id="screen-setup" class="w-full max-w-lg hidden fade-in text-center bg-white p-8 rounded-3xl shadow-md border border-slate-200/60">
@@ -89,7 +89,7 @@
                 
                 <div class="lg:col-span-4 flex flex-col space-y-4 h-full">
                     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex-grow max-h-[500px] overflow-y-auto">
-                        <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Clues & Target Words</h3>
+                        <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Clues & Context</h3>
                         <div id="clues-container" class="space-y-2"></div>
                     </div>
                     <div class="flex flex-col space-y-2">
@@ -105,7 +105,7 @@
             <h2 class="text-3xl font-bold text-slate-900 mb-3">Level <span id="success-level-num"></span> Cleared!</h2>
             
             <div id="success-scripture" class="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8 mt-6">
-                <span class="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">Decoded Scripture</span>
+                <span class="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">Decoded Result</span>
                 <p id="success-verse" class="text-slate-800 font-bold leading-relaxed"></p>
             </div>
 
@@ -122,7 +122,8 @@
         const API_VERSE_REFS = [
             "John 3:16", "Genesis 1:1", "Psalm 23:1", "Romans 8:28", "Philippians 4:13", 
             "Proverbs 3:5", "Isaiah 40:31", "Matthew 28:19", "Jeremiah 29:11", "Ephesians 2:8", 
-            "Hebrews 11:1", "James 1:5", "Psalm 119:105", "Galatians 5:22"
+            "Hebrews 11:1", "James 1:5", "Psalm 119:105", "Galatians 5:22", "1 Corinthians 13:4",
+            "Romans 12:2", "Joshua 1:9", "Matthew 6:33", "Proverbs 16:3", "Isaiah 41:10"
         ];
 
         // Static fallback for Spiral
@@ -131,10 +132,12 @@
         };
 
         const CATALOG = [
-            { id: 'brick', title: 'Masonry Quotes', sub: 'Staggered Brick Grids', desc: 'Rebuild dynamic API scriptures stone by stone.', icon: '🧱' },
+            { id: 'spot', title: 'Spot the Fake', sub: 'Discernment', desc: 'Identify the verse that is actually a misquote or cultural saying.', icon: '👁️' },
+            { id: 'brick', title: 'Masonry Quotes', sub: 'Staggered Grids', desc: 'Rebuild dynamic API scriptures stone by stone.', icon: '🧱' },
+            { id: 'row', title: 'Scripture Rows', sub: 'Stacked Lines', desc: 'Solve horizontal lines of text stacked top to bottom.', icon: '📝' },
             { id: 'radial', title: 'Concentric Rings', sub: 'Radial Trivia', desc: 'Solve API Bible words in expanding circles.', icon: '🎯' },
             { id: 'spiral', title: 'Scripture Spiral', sub: 'Colorful Pathways', desc: 'Wind your way through vibrant, color-coded timelines.', icon: '🌀' },
-            { id: 'wordsearch', title: 'Circular Search', sub: 'Procedural Generation', desc: 'Find 20-100 words in a massive circular polar grid.', icon: '🔍' },
+            { id: 'wordsearch', title: 'Circular Search', sub: 'Procedural Gen', desc: 'Find 20-100 words in a massive circular polar grid.', icon: '🔍' },
             { id: 'flower', title: 'Word Flower', sub: 'Blooming Scriptures', desc: 'Find words organically blooming in a 6-petal grid.', icon: '🌸' }
         ];
 
@@ -194,6 +197,9 @@
             } else if (State.shape === 'spiral') {
                 State.puzzle = SPIRAL_DB.easy[0];
                 setupSVGGame();
+            } else if (State.shape === 'spot') {
+                await generateSpotGame();
+                setupSVGGame();
             } else {
                 await generateDynamicPuzzle(State.shape);
                 setupSVGGame();
@@ -201,7 +207,32 @@
         }
 
         // ======================================================================
-        // DYNAMIC API DATA GENERATION (Brick & Radial)
+        // SPOT THE WRONG VERSE GAME ENGINE
+        // ======================================================================
+        async function generateSpotGame() {
+            const shuffledRefs = [...API_VERSE_REFS].sort(() => 0.5 - Math.random()).slice(0, 3);
+            const apiCalls = shuffledRefs.map(ref => fetch(`https://bible-api.com/${ref}`).then(r => r.json()).catch(() => ({text: "Fallback text", reference: ref})));
+            const results = await Promise.all(apiCalls);
+            
+            const realOptions = results.map(r => ({ text: r.text.trim().replace(/\n/g, ' '), ref: r.reference, isFake: false }));
+            
+            const fakePool = [
+                { text: "God helps those who help themselves.", ref: "Common Proverb / Algernon Sidney", isFake: true },
+                { text: "Cleanliness is next to godliness.", ref: "John Wesley Sermon", isFake: true },
+                { text: "Money is the root of all evil.", ref: "Misquote (1 Timothy 6:10)", isFake: true },
+                { text: "This too shall pass.", ref: "Persian Adage", isFake: true },
+                { text: "Hate the sin, love the sinner.", ref: "Augustine / Gandhi concept", isFake: true },
+                { text: "The lion shall lie down with the lamb.", ref: "Misquote (Isaiah 11:6)", isFake: true },
+                { text: "God will not give you more than you can handle.", ref: "Misquote (1 Cor 10:13)", isFake: true }
+            ];
+            const fakeOption = fakePool[Math.floor(Math.random() * fakePool.length)];
+            
+            let options = [...realOptions, fakeOption].sort(() => 0.5 - Math.random());
+            State.puzzle = { theme: "Discernment", options: options, fullText: "Select the phrase that is NOT actually an accurate verse in the Bible." };
+        }
+
+        // ======================================================================
+        // DYNAMIC API DATA GENERATION (Brick, Row, Radial)
         // ======================================================================
         async function generateDynamicPuzzle(shape) {
             const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
@@ -229,6 +260,12 @@
                     colOffset += w.length + 1;
                 });
                 puzzle.grid = grid;
+            } else if (shape === 'row') {
+                let grid = [];
+                words.forEach((w, i) => {
+                    grid.push({ wordIdx: i, row: i, length: w.length });
+                });
+                puzzle.grid = grid;
             } else if (shape === 'radial') {
                 clues.forEach((c, i) => { c.ring = i % 3; });
                 puzzle.sectors = 12;
@@ -247,14 +284,18 @@
             
             State.inputs = {};
             State.selectedCell = null;
-            State.selectedClue = State.puzzle.clues[0]?.id;
+            State.selectedClue = State.puzzle.clues ? State.puzzle.clues[0]?.id : null;
             
             if (State.shape === 'brick') {
                 State.puzzle.grid.forEach(w => { for (let i = 0; i < w.length; i++) State.inputs[`b-${w.row}-${w.startCol + i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.clues[w.wordIdx].answer[0] : ''; });
+            } else if (State.shape === 'row') {
+                State.puzzle.grid.forEach(w => { for (let i = 0; i < w.length; i++) State.inputs[`rw-${w.row}-${i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.clues[w.wordIdx].answer[0] : ''; });
             } else if (State.shape === 'radial') {
                 State.puzzle.clues.forEach(c => { for (let i = 0; i < c.answer.length; i++) State.inputs[`r-${c.ring}-${i}`] = (State.difficulty === 'easy' && i === 0) ? c.answer[0] : ''; });
             } else if (State.shape === 'spiral') {
                 State.puzzle.clues.forEach(c => { for (let i = 0; i < c.answer.length; i++) State.inputs[`s-${c.startIdx + i}`] = (State.difficulty === 'easy' && i === 0) ? c.answer[0] : ''; });
+            } else if (State.shape === 'spot') {
+                State.inputs['spot'] = null;
             }
             
             renderSVGBoard();
@@ -274,6 +315,16 @@
         });
 
         function renderClues() {
+            if (State.shape === 'spot') {
+                document.getElementById('clues-container').innerHTML = `
+                    <div class="p-5 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-900">
+                        <p class="text-sm font-medium leading-relaxed">Read the verses carefully. Three of these options are real verses pulled from the Bible API. One is a common misquote or cultural saying that isn't actually scripture.</p>
+                        <p class="text-sm font-bold mt-3 uppercase tracking-widest text-indigo-600">Select the fake verse!</p>
+                    </div>
+                `;
+                return;
+            }
+
             document.getElementById('clues-container').innerHTML = State.puzzle.clues.map(c => {
                 let clueText = c.text + ` <span class="text-indigo-500 font-bold">(${c.answer.length} letters)</span>`;
                 return `
@@ -286,6 +337,28 @@
         function renderSVGBoard() {
             const container = document.getElementById('board-container');
             let svgHTML = '';
+
+            if (State.shape === 'spot') {
+                let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-5 w-full px-4">';
+                State.puzzle.options.forEach((opt, i) => {
+                    const isSel = State.inputs['spot'] === i;
+                    html += `
+                        <div onclick="State.inputs['spot']=${i}; renderSVGBoard();" 
+                             class="p-6 rounded-3xl border-2 cursor-pointer transition-all active:scale-95 flex flex-col justify-between ${isSel ? 'border-indigo-600 bg-indigo-50 shadow-md ring-4 ring-indigo-100' : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'}">
+                            <p class="text-slate-800 font-semibold mb-4 leading-relaxed text-lg">"${opt.text}"</p>
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">${opt.ref}</p>
+                                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSel ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'}">
+                                    ${isSel ? '✓' : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+                return; // Return early since Spot doesn't use SVG
+            }
 
             if (State.shape === 'brick') {
                 const w = 600, h = 500, bw = 40, bh = 46;
@@ -304,6 +377,27 @@
                 });
                 svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 50vh;">${rects}</svg>`;
             } 
+            else if (State.shape === 'row') {
+                const w = 600, h = Math.max(500, State.puzzle.grid.length * 56 + 40), bs = 44;
+                let rects = '';
+                State.puzzle.grid.forEach(word => {
+                    const rowWidth = word.length * (bs + 6);
+                    const startX = (w - rowWidth) / 2;
+                    const y = word.row * (bs + 12) + 20;
+
+                    for (let i = 0; i < word.length; i++) {
+                        const x = startX + i * (bs + 6);
+                        const key = `rw-${word.row}-${i}`, isSel = State.selectedCell === key, val = State.inputs[key] || '';
+                        rects += `
+                            <g onclick="handleCellClick('${key}')" class="cursor-pointer">
+                                <rect x="${x}" y="${y}" width="${bs}" height="${bs}" rx="6" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2 : 1}" />
+                                <text x="${x + bs/2}" y="${y + bs/2 + 6}" text-anchor="middle" class="font-bold text-lg pointer-events-none" fill="#0f172a">${val}</text>
+                            </g>
+                        `;
+                    }
+                });
+                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 50vh;">${rects}</svg>`;
+            }
             else if (State.shape === 'radial') {
                 const w = 500, h = 500, cx = w/2, cy = h/2;
                 let paths = '';
@@ -402,7 +496,6 @@
             
             let grid = Array(size).fill(null).map(() => Array(size).fill(null));
             
-            // Map out the geometric boundaries dynamically based on the game type
             for (let r=0; r<size; r++) {
                 for (let c=0; c<size; c++) {
                     const dx = c - center;
@@ -410,9 +503,8 @@
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     
                     if (shape === 'wordsearch') {
-                        if (dist <= size/2) grid[r][c] = ''; // Circular bounds
+                        if (dist <= size/2) grid[r][c] = '';
                     } else if (shape === 'flower') {
-                        // Trigonometric Rose Curve (6 Petals)
                         const angle = Math.atan2(dy, dx);
                         const maxDist = (size / 2 - 1) * (0.7 + 0.3 * Math.cos(6 * angle)); 
                         if (dist <= maxDist) grid[r][c] = '';
@@ -571,13 +663,21 @@
                 State.ws.words.forEach(w => { w.found = true; State.ws.found.push(...w.coords); });
                 renderGridGame();
                 setTimeout(triggerWin, 1500); 
+            } else if (State.shape === 'spot') {
+                const fakeIdx = State.puzzle.options.findIndex(o => o.isFake);
+                State.inputs['spot'] = fakeIdx;
+                renderSVGBoard();
+                setTimeout(triggerWin, 1500);
             } else {
-                if (State.shape === 'brick' || State.shape === 'radial') {
+                if (State.shape === 'brick' || State.shape === 'radial' || State.shape === 'row') {
                     State.puzzle.clues.forEach(c => {
                         for (let i = 0; i < c.answer.length; i++) {
                             if(State.shape === 'brick') {
                                 const wInfo = State.puzzle.grid.find(g => g.wordIdx === c.id - 1);
                                 if(wInfo) State.inputs[`b-${wInfo.row}-${wInfo.startCol + i}`] = c.answer[i];
+                            } else if (State.shape === 'row') {
+                                const wInfo = State.puzzle.grid.find(g => g.wordIdx === c.id - 1);
+                                if(wInfo) State.inputs[`rw-${wInfo.row}-${i}`] = c.answer[i];
                             } else {
                                 State.inputs[`r-${c.ring}-${i}`] = c.answer[i];
                             }
@@ -593,11 +693,21 @@
 
         function verifyAnswers() {
             let isValid = true;
-            if (State.shape === 'brick') {
+            if (State.shape === 'spot') {
+                const sel = State.inputs['spot'];
+                if (sel === null || !State.puzzle.options[sel].isFake) isValid = false;
+            } else if (State.shape === 'brick') {
                 State.puzzle.grid.forEach(w => {
                     const ans = State.puzzle.clues[w.wordIdx].answer;
                     for (let i = 0; i < w.length; i++) {
                         if ((State.inputs[`b-${w.row}-${w.startCol + i}`] || '') !== ans[i]) isValid = false;
+                    }
+                });
+            } else if (State.shape === 'row') {
+                State.puzzle.grid.forEach(w => {
+                    const ans = State.puzzle.clues[w.wordIdx].answer;
+                    for (let i = 0; i < w.length; i++) {
+                        if ((State.inputs[`rw-${w.row}-${i}`] || '') !== ans[i]) isValid = false;
                     }
                 });
             } else if (State.shape === 'radial') {
@@ -615,7 +725,7 @@
             if (isValid) triggerWin();
             else {
                 const err = document.getElementById('validation-error');
-                err.innerText = "Some letters are incorrect or missing. Keep trying!";
+                err.innerText = State.shape === 'spot' ? "That is a real verse! Find the one that isn't." : "Some letters are incorrect or missing. Keep trying!";
                 err.classList.remove('hidden');
             }
         }
@@ -630,6 +740,10 @@
             document.getElementById('success-level-num').innerText = State.level;
             if (State.shape === 'wordsearch' || State.shape === 'flower') {
                 document.getElementById('success-scripture').classList.add('hidden');
+            } else if (State.shape === 'spot') {
+                const fake = State.puzzle.options.find(o => o.isFake);
+                document.getElementById('success-scripture').classList.remove('hidden');
+                document.getElementById('success-verse').innerHTML = `You spotted it!<br><br><span class="text-rose-600">"${fake.text}"</span><br><span class="text-xs font-semibold text-slate-400 uppercase mt-2 block">Source: ${fake.ref}</span>`;
             } else {
                 document.getElementById('success-scripture').classList.remove('hidden');
                 document.getElementById('success-verse').innerText = `"${State.puzzle.verse}"`;
