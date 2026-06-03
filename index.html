@@ -6,7 +6,6 @@
     <title>ScriptureShapes | Interactive Bible Puzzles</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom styles for animations and smooth interactions */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
@@ -38,8 +37,7 @@
                 <h2 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-5 tracking-tight">Engage the Word. <br> Break the Grid.</h2>
                 <p class="text-lg text-slate-500 font-medium leading-relaxed">Choose a geometric format below to test your knowledge in new ways.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="game-catalog">
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="game-catalog"></div>
         </section>
 
         <section id="screen-setup" class="w-full max-w-lg hidden fade-in text-center bg-white p-8 rounded-3xl shadow-md border border-slate-200/60">
@@ -59,8 +57,7 @@
         </section>
 
         <section id="screen-playing" class="w-full hidden fade-in">
-            <div id="wordsearch-container" class="hidden w-full max-w-4xl mx-auto flex flex-col items-center">
-                </div>
+            <div id="wordsearch-container" class="hidden w-full max-w-4xl mx-auto flex flex-col items-center"></div>
             
             <div id="svg-game-container" class="hidden w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div class="lg:col-span-8 bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 min-h-[500px] flex flex-col">
@@ -80,7 +77,10 @@
                         <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Clues</h3>
                         <div id="clues-container" class="space-y-2"></div>
                     </div>
-                    <button onclick="verifyAnswers()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-2xl active:scale-95 transition-all">Check Answers</button>
+                    <div class="flex flex-col space-y-2">
+                        <button onclick="verifyAnswers()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-2xl active:scale-95 transition-all">Check Answers</button>
+                        <button onclick="showAnswers()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-2xl active:scale-95 transition-all">Show Answers</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -103,48 +103,32 @@
     </main>
 
     <script>
-        // ==========================================
-        // 1. DATABASE & CONFIG
-        // ==========================================
         const DB = {
             brick: { easy: [{ level: 1, theme: "Proverbs 3:5", verse: "TRUST IN THE LORD WITH ALL YOUR HEART", clues: [{ id: 1, text: "Firm belief in the reliability or truth of someone", answer: "TRUST" }, { id: 2, text: "Preposition indicating inclusion or location", answer: "IN" }, { id: 3, text: "The supreme being; God", answer: "LORD" }], grid: [{ wordIdx: 0, row: 0, startCol: 1, length: 5 }, { wordIdx: 1, row: 0, startCol: 7, length: 2 }, { wordIdx: 2, row: 1, startCol: 3, length: 4 }] }] },
             radial: { easy: [{ level: 1, theme: "Fruit of the Spirit", verse: "LOVE JOY PEACE", rings: 3, sectors: 8, clues: [{ id: 1, text: "The greatest theological virtue (Galatians 5:22)", answer: "LOVE", ring: 0 }, { id: 2, text: "Gladdening emotion or delight", answer: "JOY", ring: 1 }, { id: 3, text: "Tranquility; absence of conflict", answer: "PEACE", ring: 2 }] }] },
             spiral: { easy: [{ level: 1, theme: "The Path of Creation", verse: "LIGHTADAMEVEGARDEN", clues: [{ id: 1, text: "Created on Day 1 ('Let there be...')", answer: "LIGHT", startIdx: 0 }, { id: 2, text: "The first man", answer: "ADAM", startIdx: 5 }, { id: 3, text: "The first woman", answer: "EVE", startIdx: 9 }, { id: 4, text: "The paradise home: _____ of Eden", answer: "GARDEN", startIdx: 12 }] }] }
         };
 
-        const WORD_BANK = ["GOD", "ARK", "SIN", "LOVE", "HOPE", "FAITH", "JESUS", "MOSES", "DAVID", "GRACE", "BIBLE", "ANGEL", "PEACE", "GLORY", "CROSS", "SPIRIT", "CHRIST", "GOSPEL", "PRAYER"];
+        const WORD_BANK = ["GOD", "ARK", "SIN", "LOVE", "HOPE", "FAITH", "JESUS", "MOSES", "DAVID", "GRACE", "BIBLE", "ANGEL", "PEACE", "GLORY", "CROSS"];
+        
+        // Verses for API to pick from randomly
+        const API_VERSE_REFS = ["John 3:16", "Genesis 1:1", "Psalm 23:1", "Romans 8:28", "Philippians 4:13", "Proverbs 3:5", "Isaiah 40:31", "Matthew 28:19", "Jeremiah 29:11", "Ephesians 2:8", "Hebrews 11:1", "James 1:5"];
 
         const CATALOG = [
             { id: 'brick', title: 'Masonry Quotes', sub: 'Staggered Brick Grids', desc: 'Rebuild scriptures stone by stone.', icon: '🧱' },
             { id: 'radial', title: 'Concentric Rings', sub: 'Radial Trivia', desc: 'Solve Bible trivia in expanding circles.', icon: '🎯' },
             { id: 'spiral', title: 'Scripture Spiral', sub: 'Continuous Pathways', desc: 'Wind your way through biblical timelines.', icon: '🌀' },
-            { id: 'wordsearch', title: 'Infinite Word Search', sub: 'Procedural Generation', desc: 'Find biblical words in a scaling grid.', icon: '🔍' }
+            { id: 'wordsearch', title: 'Infinite Word Search', sub: 'Procedural Generation', desc: 'Find biblical words fetched automatically via API.', icon: '🔍' }
         ];
 
-        // ==========================================
-        // 2. STATE MANAGEMENT
-        // ==========================================
         let State = {
-            screen: 'home',
-            shape: '',
-            difficulty: 'easy',
-            level: 1,
-            puzzle: null,
-            inputs: {},
-            selectedCell: null,
-            selectedClue: null,
-            ws: { grid: [], words: [], found: [], startCell: null, size: 5 }
+            screen: 'home', shape: '', difficulty: 'easy', level: 1, puzzle: null, inputs: {}, selectedCell: null, selectedClue: null,
+            ws: { grid: [], words: [], found: [], startCell: null, size: 5, apiRef: '', apiVerse: '' }
         };
 
-        // DOM Elements
         const screens = ['home', 'setup', 'playing', 'success'].map(s => document.getElementById(`screen-${s}`));
         const hiddenInput = document.getElementById('hidden-input');
 
-        // ==========================================
-        // 3. CORE LOGIC
-        // ==========================================
-
-        // Initialize Home Dashboard
         document.getElementById('game-catalog').innerHTML = CATALOG.map(g => `
             <div onclick="selectGame('${g.id}')" class="group bg-white rounded-3xl p-8 border border-slate-200/60 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all duration-300 cursor-pointer flex flex-col active:scale-95">
                 <div class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">${g.icon}</div>
@@ -173,15 +157,8 @@
             document.getElementById('btn-diff-hard').className = diff === 'hard' ? 'p-5 rounded-2xl border-2 text-left border-slate-900 bg-slate-50' : 'p-5 rounded-2xl border-2 text-left border-slate-100 hover:border-slate-300';
         }
 
-        function startGame() {
-            State.level = 1;
-            loadLevel();
-        }
-
-        function nextLevel() {
-            State.level++;
-            loadLevel();
-        }
+        function startGame() { State.level = 1; loadLevel(); }
+        function nextLevel() { State.level++; loadLevel(); }
 
         function loadLevel() {
             switchScreen('playing');
@@ -195,34 +172,24 @@
                 document.getElementById('wordsearch-container').classList.add('hidden');
                 document.getElementById('svg-game-container').classList.remove('hidden');
                 
-                // Fallback to level 1 if no data for current level (mock db limits)
                 const shapeData = DB[State.shape]?.[State.difficulty] || DB[State.shape]?.['easy'];
                 State.puzzle = shapeData.find(p => p.level === State.level) || shapeData[0];
                 
                 document.getElementById('game-theme').innerText = State.puzzle.theme;
                 document.getElementById('game-level-badge').innerText = `Level ${State.level}`;
                 
-                // Init inputs
                 State.inputs = {};
                 State.selectedCell = null;
                 State.selectedClue = State.puzzle.clues[0].id;
                 
-                // Prefill easy mode
                 if (State.shape === 'brick') {
-                    State.puzzle.grid.forEach(w => {
-                        for (let i = 0; i < w.length; i++) State.inputs[`b-${w.row}-${w.startCol + i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.clues[w.wordIdx].answer[0] : '';
-                    });
+                    State.puzzle.grid.forEach(w => { for (let i = 0; i < w.length; i++) State.inputs[`b-${w.row}-${w.startCol + i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.clues[w.wordIdx].answer[0] : ''; });
                 }
-                // (Radial and Spiral prefill logic omitted for brevity in raw JS, same concept applies)
-
                 renderSVGBoard();
                 renderClues();
             }
         }
 
-        // ==========================================
-        // 4. SVG RENDERER (Vanilla JS Strings)
-        // ==========================================
         function handleCellClick(key) {
             State.selectedCell = key;
             renderSVGBoard();
@@ -232,20 +199,24 @@
         hiddenInput.addEventListener('input', (e) => {
             if (!State.selectedCell) return;
             const char = e.target.value.slice(-1).toUpperCase();
-            if (/^[A-Z]$/.test(char) || char === '') {
-                State.inputs[State.selectedCell] = char;
-                renderSVGBoard();
-            }
-            e.target.value = ''; // clear hidden input
+            if (/^[A-Z]$/.test(char) || char === '') { State.inputs[State.selectedCell] = char; renderSVGBoard(); }
+            e.target.value = ''; 
         });
 
         function renderClues() {
             const container = document.getElementById('clues-container');
-            container.innerHTML = State.puzzle.clues.map(c => `
+            container.innerHTML = State.puzzle.clues.map(c => {
+                // NEW FEATURE: Add word length to Scripture Spiral (and others)
+                let clueText = c.text;
+                if (State.shape === 'spiral') {
+                    clueText += ` <span class="text-indigo-500 font-bold">(${c.answer.length} letters)</span>`;
+                }
+
+                return `
                 <div onclick="State.selectedClue = ${c.id}; renderClues();" class="p-4 rounded-2xl cursor-pointer border ${State.selectedClue === c.id ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-transparent border-transparent hover:bg-slate-50 text-slate-600'} transition-colors">
-                    <p class="text-sm font-medium"><strong>${c.id}.</strong> ${c.text}</p>
+                    <p class="text-sm font-medium"><strong>${c.id}.</strong> ${clueText}</p>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function renderSVGBoard() {
@@ -257,13 +228,8 @@
                 let rects = '';
                 State.puzzle.grid.forEach(word => {
                     for (let i = 0; i < word.length; i++) {
-                        const col = word.startCol + i;
-                        const x = col * bw + (word.row % 2 * (bw / 2)) + 30;
-                        const y = word.row * bh + 60;
-                        const key = `b-${word.row}-${col}`;
-                        const isSel = State.selectedCell === key;
-                        const val = State.inputs[key] || '';
-                        
+                        const col = word.startCol + i, x = col * bw + (word.row % 2 * (bw / 2)) + 30, y = word.row * bh + 60;
+                        const key = `b-${word.row}-${col}`, isSel = State.selectedCell === key, val = State.inputs[key] || '';
                         rects += `
                             <g onclick="handleCellClick('${key}')" class="cursor-pointer">
                                 <rect x="${x}" y="${y}" width="${bw-4}" height="${bh-4}" rx="6" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2.5 : 1.5}" />
@@ -275,18 +241,13 @@
                 svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 60vh;">${rects}</svg>`;
             } 
             else if (State.shape === 'spiral') {
-                // Simplified Spiral Renderer for Vanilla JS
                 const w = 540, h = 440, bs = 40;
                 let rects = '';
                 for (let i = 0; i < State.puzzle.verse.length; i++) {
                     let x = i < 10 ? i : (i < 17 ? 9 : (i < 25 ? 9 - (i - 16) : 2));
                     let y = i < 10 ? 0 : (i < 17 ? i - 9 : (i < 25 ? 7 : 7 - (i - 24)));
-                    
                     const xP = x * (bs + 6) + 40, yP = y * (bs + 6) + 40;
-                    const key = `s-${i}`;
-                    const isSel = State.selectedCell === key;
-                    const val = State.inputs[key] || '';
-
+                    const key = `s-${i}`, isSel = State.selectedCell === key, val = State.inputs[key] || '';
                     rects += `
                         <g onclick="handleCellClick('${key}')" class="cursor-pointer">
                             <rect x="${xP}" y="${yP}" width="${bs}" height="${bs}" rx="8" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2.5 : 1.5}" />
@@ -297,9 +258,35 @@
                 }
                 svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 60vh;">${rects}</svg>`;
             }
-            // (Radial logic omitted to save space, relies on trigonometric HTML generation)
 
             container.innerHTML = svgHTML;
+        }
+
+        // NEW FEATURE: Show Answers Logic
+        function showAnswers() {
+            if (State.shape === 'wordsearch') {
+                State.ws.words.forEach(w => {
+                    w.found = true;
+                    State.ws.found.push(...w.coords);
+                });
+                renderWordSearch();
+                setTimeout(triggerWin, 800);
+            } else {
+                if (State.shape === 'brick') {
+                    State.puzzle.grid.forEach(w => {
+                        const ans = State.puzzle.clues[w.wordIdx].answer;
+                        for (let i = 0; i < w.length; i++) {
+                            State.inputs[`b-${w.row}-${w.startCol + i}`] = ans[i];
+                        }
+                    });
+                } else if (State.shape === 'spiral') {
+                    for (let i = 0; i < State.puzzle.verse.length; i++) {
+                        State.inputs[`s-${i}`] = State.puzzle.verse[i];
+                    }
+                }
+                renderSVGBoard();
+                setTimeout(triggerWin, 800);
+            }
         }
 
         function verifyAnswers() {
@@ -325,20 +312,50 @@
             }
         }
 
-        // ==========================================
-        // 5. WORD SEARCH ENGINE
-        // ==========================================
-        function generateWordSearch() {
+        // NEW FEATURE: Asynchronous Word Search via Bible API
+        async function generateWordSearch() {
+            const container = document.getElementById('wordsearch-container');
+            container.innerHTML = `<div class="p-12 text-center text-indigo-600 font-bold animate-pulse text-lg">Fetching scripture from bible-api.com...</div>`;
+
+            // Pick a random verse reference to use as the question/theme
+            const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
+            let generatedWords = [];
+            let fetchedText = "";
+
+            try {
+                // Fetch live data from the API
+                const response = await fetch(`https://bible-api.com/${ref}`);
+                const data = await response.json();
+                fetchedText = data.text.trim();
+                
+                // Clean text to extract unique words
+                const cleanedStr = fetchedText.replace(/[^a-zA-Z\s]/g, '').toUpperCase();
+                generatedWords = [...new Set(cleanedStr.split(/\s+/))];
+            } catch (error) {
+                console.error("API Fetch failed, using fallback", error);
+                fetchedText = "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.";
+                generatedWords = WORD_BANK;
+            }
+
+            State.ws.apiRef = ref;
+            State.ws.apiVerse = fetchedText;
+
             const size = Math.min(15, Math.max(5, Math.floor(State.level / 6) + 5));
             const wc = Math.min(10, Math.max(3, Math.floor(State.level / 8) + 3));
             State.ws.size = size;
             
             let grid = Array(size).fill(null).map(() => Array(size).fill(''));
-            let bank = [...WORD_BANK].filter(w => w.length <= size).sort(() => 0.5 - Math.random());
-            let words = bank.slice(0, wc);
+            
+            // Filter the fetched API words to ensure they fit the grid length
+            let validWords = generatedWords.filter(w => w.length >= 3 && w.length <= size).sort(() => 0.5 - Math.random());
+            if (validWords.length < wc) {
+                // Fallback to static bank if verse was too short
+                validWords = validWords.concat(WORD_BANK.filter(w => w.length <= size)).slice(0, wc);
+            }
+            let words = validWords.slice(0, wc);
             let placed = [];
 
-            const dirs = [[0,1], [1,0]]; // E, S (Simplified for vanilla js space)
+            const dirs = [[0,1], [1,0], [1,1]]; 
             
             words.forEach(word => {
                 for(let a=0; a<100; a++) {
@@ -368,6 +385,7 @@
             State.ws.words = placed;
             State.ws.found = [];
             State.ws.startCell = null;
+            
             renderWordSearch();
         }
 
@@ -375,7 +393,6 @@
             if (!State.ws.startCell) {
                 State.ws.startCell = {r, c};
             } else {
-                // Check line
                 const sr = State.ws.startCell.r, sc = State.ws.startCell.c;
                 const dr = r - sr, dc = c - sc;
                 const steps = Math.max(Math.abs(dr), Math.abs(dc));
@@ -400,7 +417,7 @@
 
         function renderWordSearch() {
             const cont = document.getElementById('wordsearch-container');
-            let gridHTML = `<div class="grid gap-1 mb-6 p-4 bg-white rounded-2xl shadow-sm border border-slate-200" style="grid-template-columns: repeat(${State.ws.size}, minmax(0, 1fr))">`;
+            let gridHTML = `<div class="grid gap-1 mb-6 p-4 bg-white rounded-2xl shadow-sm border border-slate-200 w-full overflow-x-auto" style="grid-template-columns: repeat(${State.ws.size}, minmax(0, 1fr))">`;
             
             for (let r=0; r<State.ws.size; r++) {
                 for (let c=0; c<State.ws.size; c++) {
@@ -416,27 +433,30 @@
             }
             gridHTML += `</div>`;
             
-            let wordsHTML = `<div class="w-full bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60"><h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-100 pb-2">Target Words</h3><div class="flex flex-wrap gap-2">`;
+            let wordsHTML = `<div class="w-full bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60"><h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-100 pb-2">Words to find in passage</h3><div class="flex flex-wrap gap-2">`;
             State.ws.words.forEach(w => {
                 wordsHTML += `<span class="px-3 py-1.5 rounded-full text-sm font-bold ${w.found ? 'bg-slate-100 text-slate-400 line-through' : 'bg-indigo-50 text-indigo-700'}">${w.word}</span>`;
             });
             wordsHTML += `</div></div>`;
 
             cont.innerHTML = `
-                <div class="w-full flex justify-between items-end mb-6">
+                <div class="w-full flex justify-between items-end mb-4">
                     <div>
                         <h2 class="text-2xl font-black text-slate-900 tracking-tight">Word Search</h2>
-                        <p class="text-sm font-semibold text-slate-500 uppercase tracking-widest">Level ${State.level}</p>
+                        <p class="text-sm font-semibold text-slate-500 uppercase tracking-widest">Level ${State.level} | Passage: ${State.ws.apiRef}</p>
                     </div>
+                    <button onclick="showAnswers()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition-all text-sm active:scale-95">Show Answers</button>
                 </div>
+                
+                <div class="w-full mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                     <p class="text-sm text-indigo-900 italic font-medium leading-relaxed">"${State.ws.apiVerse}"</p>
+                </div>
+
                 ${gridHTML}
                 ${wordsHTML}
             `;
         }
 
-        // ==========================================
-        // 6. WIN LOGIC
-        // ==========================================
         function triggerWin() {
             if (State.shape === 'wordsearch') {
                 document.getElementById('success-scripture').classList.add('hidden');
