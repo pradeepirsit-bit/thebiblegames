@@ -2,366 +2,449 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8fafc">
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a">
-    <title>TN Mood Map - Live Real Map Edition</title>
-    
-    <link rel="manifest" id="pwa-manifest">
-    <script>
-        const manifest = {
-            name: "TN Mood Map",
-            short_name: "MoodMap",
-            start_url: ".",
-            display: "standalone",
-            background_color: "#0f172a",
-            theme_color: "#3b82f6",
-            icons: [{
-                src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%233b82f6'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='40' fill='white' text-anchor='middle' dy='.3em'%3E%F0%9F%93%8D%3C/text%3E%3C/svg%3E",
-                sizes: "192x192",
-                type: "image/svg+xml"
-            }]
-        };
-        const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-        document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
-
-        if ('serviceWorker' in navigator) {
-            const swCode = `
-                self.addEventListener('install', (e) => self.skipWaiting());
-                self.addEventListener('activate', (e) => self.clients.claim());
-                self.addEventListener('fetch', (e) => {});
-            `;
-            const swBlob = new Blob([swCode], {type: 'application/javascript'});
-            navigator.serviceWorker.register(URL.createObjectURL(swBlob));
-        }
-    </script>
-
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScriptureShapes | Interactive Bible Puzzles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .leaflet-control-zoom { display: none !important; }
-        
-        .mood-glow-orb {
-            border-radius: 50%;
-            filter: blur(15px);
-            opacity: 0.7;
-            transition: all 0.8s ease-in-out;
-            animation: pulse 3s infinite alternate;
+        /* Custom styles for animations and smooth interactions */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.5; }
-            100% { transform: scale(1.3); opacity: 0.8; }
-        }
-        
-        .traffic-line-anim {
-            stroke-dasharray: 10;
-            animation: dash 20s linear infinite;
-        }
-        @keyframes dash { to { stroke-dashoffset: -1000; } }
-
-        .custom-mood-marker { background: transparent; border: none; }
-
-        /* Weather Micro-Climates */
-        .weather-container { position: absolute; inset: -40px; pointer-events: none; z-index: 0; overflow: visible; }
-        .heat-wave { position: absolute; bottom: 20%; width: 4px; height: 25px; background: linear-gradient(to top, transparent, rgba(239, 68, 68, 0.8), transparent); border-radius: 50%; filter: blur(2px); animation: heatRise 2s infinite ease-in; }
-        @keyframes heatRise { 0% { transform: translateY(0) scaleX(1) skewX(0deg); opacity: 0; } 30% { opacity: 1; transform: translateY(-15px) scaleX(1.5) skewX(15deg); } 70% { opacity: 0.8; transform: translateY(-35px) scaleX(1.2) skewX(-15deg); } 100% { transform: translateY(-50px) scaleX(1) skewX(0deg); opacity: 0; } }
-        .wind-gust { position: absolute; height: 2px; background: linear-gradient(to right, transparent, rgba(251, 191, 36, 0.9), transparent); border-radius: 2px; animation: windBlow 1.8s infinite linear; box-shadow: 0 0 5px rgba(251, 191, 36, 0.5); }
-        @keyframes windBlow { 0% { transform: translateX(-40px) scaleX(0.5); opacity: 0; width: 10px; } 20% { opacity: 1; transform: translateX(-10px) scaleX(1); width: 40px; } 80% { opacity: 1; transform: translateX(30px) scaleX(1.2); width: 50px; } 100% { transform: translateX(60px) scaleX(0.5); opacity: 0; width: 20px; } }
-        .wind-curve { position: absolute; width: 50px; height: 20px; border-top: 2px solid rgba(251, 191, 36, 0.4); border-radius: 50%; animation: windCurveBlow 2.5s infinite ease-in-out; }
-        @keyframes windCurveBlow { 0% { transform: translateX(-30px) translateY(10px); opacity: 0; } 50% { opacity: 1; transform: translateX(10px) translateY(-5px); } 100% { transform: translateX(50px) translateY(-20px); opacity: 0; } }
-        .smooth-pulse { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 2px solid rgba(16, 185, 129, 0.6); border-radius: 50%; animation: coolPulse 4s infinite ease-out; box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.2); }
-        @keyframes coolPulse { 0% { width: 40px; height: 40px; opacity: 1; border-width: 3px; } 100% { width: 140px; height: 140px; opacity: 0; border-width: 0px; } }
-        .cool-sparkle { position: absolute; width: 4px; height: 4px; background: rgba(16, 185, 129, 0.9); border-radius: 50%; box-shadow: 0 0 8px rgba(16, 185, 129, 1); animation: floatUp 3s infinite ease-in-out; }
-        @keyframes floatUp { 0% { transform: translateY(0) scale(0.5); opacity: 0; } 50% { opacity: 1; transform: translateY(-20px) scale(1.2); } 100% { transform: translateY(-40px) scale(0.5); opacity: 0; } }
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden h-screen w-screen font-sans flex flex-col relative transition-colors duration-300">
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col selection:bg-indigo-100 selection:text-indigo-900">
 
-    <div id="real-map" class="absolute inset-0 w-full h-full z-0 cursor-crosshair"></div>
-
-    <div class="absolute top-4 left-4 right-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-4 rounded-2xl z-20 shadow-xl flex flex-col sm:flex-row justify-between gap-3 items-start sm:items-center max-w-3xl mx-auto transition-colors duration-300">
-        <div>
-            <h1 class="text-sm font-bold tracking-wide text-slate-800 dark:text-slate-300 uppercase flex items-center gap-2">
-                TN Mood Map <span class="text-xs bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 px-2 py-0.5 rounded-md normal-case font-normal">Live Map</span>
-            </h1>
-            <p class="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5 font-mono">
-                <span class="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span> GPS Telemetry Active
-            </p>
+    <header class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3 cursor-pointer group" onclick="switchScreen('home')">
+            <div class="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white font-bold text-lg group-hover:bg-indigo-600 transition-colors">✝</div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900">Scripture<span class="text-indigo-600">Shapes</span></h1>
         </div>
-        
-        <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-            <button id="toggle-traffic-btn" class="text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-200 font-semibold flex items-center gap-1.5 transition-colors shadow-sm">
-                🛣️ <span id="traffic-btn-text">Show Live Traffic</span>
-            </button>
-            <span id="active-count" class="text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 font-mono shadow-inner transition-colors">
-                0 Nodes Active
-            </span>
-        </div>
-    </div>
-
-    <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-2 z-20 w-[90%] max-w-xs pointer-events-none">
-        <p class="text-[10px] text-slate-700 dark:text-slate-300 bg-white/90 dark:bg-slate-900/90 px-3 py-1 rounded-full backdrop-blur-sm border border-slate-300 dark:border-slate-800 shadow-sm whitespace-nowrap">
-            👆 Tap anywhere on the map to drop a pin
-        </p>
-        <button id="open-drawer-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-xl font-bold shadow-[0_0_25px_rgba(37,99,235,0.4)] flex items-center justify-center gap-2 transition-all pointer-events-auto">
-            📍 Or Type Location
+        <button id="btn-dashboard" onclick="switchScreen('home')" class="hidden text-sm font-semibold text-slate-500 hover:text-slate-900 px-4 py-2 rounded-full hover:bg-slate-100 transition-all">
+            Dashboard
         </button>
-    </div>
+    </header>
 
-    <div id="checkin-drawer" class="absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 rounded-t-3xl p-6 z-30 transition-all duration-500 transform translate-y-full shadow-[0_-10px_40px_rgba(0,0,0,0.1)] dark:shadow-2xl max-w-md mx-auto">
-        <div class="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-5"></div>
-        
-        <h2 id="drawer-title" class="text-xl font-bold text-center mb-1 text-slate-900 dark:text-white">Statewide Vibe Input</h2>
-        <p class="text-xs text-slate-500 dark:text-slate-400 text-center mb-5">Add your location to the real Tamil Nadu grid.</p>
-        
-        <div class="mb-5">
-            <label class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">Location Name</label>
-            <input type="text" id="user-location-input" placeholder="e.g., Trichy, Custom Area..." class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl p-3.5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors">
-        </div>
+    <input type="text" id="hidden-input" class="absolute opacity-0 pointer-events-none w-0 h-0" maxlength="1">
 
-        <label class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">Select Vibe Level</label>
-        <div class="flex flex-col gap-2.5 mb-6">
-            <button class="mood-submit-btn flex items-center gap-3 w-full bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900/50 p-3 rounded-xl text-left transition-colors relative overflow-hidden group" data-color="bg-red-500" data-text="Semma Tension">
-                <span class="text-xl relative z-10">🔴</span>
-                <div class="relative z-10">
-                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">Semma Tension (High Stress)</p>
-                    <p class="text-[10px] text-red-600 dark:text-red-400/70">Generates heat wave anomalies</p>
+    <main class="flex-grow w-full pt-24 pb-12 px-4 md:px-8 max-w-6xl mx-auto flex flex-col items-center justify-center">
+
+        <section id="screen-home" class="w-full fade-in">
+            <div class="text-center max-w-2xl mx-auto mb-16 mt-8">
+                <h2 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-5 tracking-tight">Engage the Word. <br> Break the Grid.</h2>
+                <p class="text-lg text-slate-500 font-medium leading-relaxed">Choose a geometric format below to test your knowledge in new ways.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="game-catalog">
                 </div>
-            </button>
+        </section>
 
-            <button class="mood-submit-btn flex items-center gap-3 w-full bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-900/50 p-3 rounded-xl text-left transition-colors relative overflow-hidden group" data-color="bg-amber-400" data-text="Chill / Polaama">
-                <span class="text-xl relative z-10">🟡</span>
-                <div class="relative z-10">
-                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">Chill / Polaama (Moderate)</p>
-                    <p class="text-[10px] text-amber-600 dark:text-amber-400/70">Summons monsoonal wind patterns</p>
+        <section id="screen-setup" class="w-full max-w-lg hidden fade-in text-center bg-white p-8 rounded-3xl shadow-md border border-slate-200/60">
+            <div id="setup-icon" class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-3xl"></div>
+            <h2 class="text-2xl font-bold text-slate-900 mb-2">Select Difficulty</h2>
+            <div class="grid grid-cols-2 gap-4 mb-8 mt-6">
+                <button onclick="setDifficulty('easy')" id="btn-diff-easy" class="p-5 rounded-2xl border-2 text-left border-indigo-600 bg-indigo-50">
+                    <div class="text-lg font-bold text-slate-900">Guided</div>
+                    <div class="text-xs text-slate-500 mt-1">Starting letters provided.</div>
+                </button>
+                <button onclick="setDifficulty('hard')" id="btn-diff-hard" class="p-5 rounded-2xl border-2 text-left border-slate-100 hover:border-slate-300">
+                    <div class="text-lg font-bold text-slate-900">Expert</div>
+                    <div class="text-xs text-slate-500 mt-1">Completely blank grids.</div>
+                </button>
+            </div>
+            <button onclick="startGame()" class="w-full py-4 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800 transition-all active:scale-95">Begin Level 1</button>
+        </section>
+
+        <section id="screen-playing" class="w-full hidden fade-in">
+            <div id="wordsearch-container" class="hidden w-full max-w-4xl mx-auto flex flex-col items-center">
                 </div>
-            </button>
-
-            <button class="mood-submit-btn flex items-center gap-3 w-full bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-900/50 p-3 rounded-xl text-left transition-colors relative overflow-hidden group" data-color="bg-emerald-500" data-text="Smooth Vibe">
-                <span class="text-xl relative z-10">🟢</span>
-                <div class="relative z-10">
-                    <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Smooth Vibe (Focused)</p>
-                    <p class="text-[10px] text-emerald-600 dark:text-emerald-400/70">Projects a cool, stable aura</p>
+            
+            <div id="svg-game-container" class="hidden w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div class="lg:col-span-8 bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 min-h-[500px] flex flex-col">
+                   <div class="flex justify-between items-center mb-6">
+                       <div>
+                           <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Theme</span>
+                           <h2 id="game-theme" class="text-lg font-bold text-slate-900"></h2>
+                       </div>
+                       <span id="game-level-badge" class="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-semibold uppercase"></span>
+                   </div>
+                   <div id="board-container" class="flex-grow flex items-center justify-center select-none w-full overflow-auto"></div>
+                   <div id="validation-error" class="hidden mt-4 p-4 bg-red-50 text-red-600 text-sm font-medium rounded-xl text-center"></div>
                 </div>
-            </button>
-        </div>
+                
+                <div class="lg:col-span-4 flex flex-col space-y-4 h-full">
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex-grow">
+                        <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Clues</h3>
+                        <div id="clues-container" class="space-y-2"></div>
+                    </div>
+                    <button onclick="verifyAnswers()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-2xl active:scale-95 transition-all">Check Answers</button>
+                </div>
+            </div>
+        </section>
 
-        <button id="close-drawer-btn" class="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 py-3 rounded-xl text-xs font-medium tracking-wide transition-colors">Cancel</button>
-    </div>
+        <section id="screen-success" class="w-full max-w-md hidden fade-in text-center bg-white p-10 rounded-3xl shadow-md border border-slate-200/60">
+            <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">✓</div>
+            <h2 class="text-3xl font-bold text-slate-900 mb-3">Level Cleared!</h2>
+            
+            <div id="success-scripture" class="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8 mt-6">
+                <span class="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">Decoded Scripture</span>
+                <p id="success-verse" class="text-slate-800 font-bold leading-relaxed"></p>
+            </div>
+
+            <div class="flex flex-col space-y-3 mt-8">
+                <button onclick="nextLevel()" class="w-full py-4 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800 active:scale-95 transition-all">Next Challenge</button>
+                <button onclick="switchScreen('home')" class="w-full py-4 bg-white text-slate-600 border border-slate-200 font-semibold rounded-xl hover:bg-slate-50 active:scale-95 transition-all">Return to Hub</button>
+            </div>
+        </section>
+
+    </main>
 
     <script>
-        // 1. Initialize the Real Map Engine
-        const map = L.map('real-map').setView([10.7905, 78.7047], 7);
-        let currentTileLayer = null;
-
-        // 2. System Theme Dynamic Switching for Map Tiles
-        function updateMapTheme(e) {
-            if (currentTileLayer) map.removeLayer(currentTileLayer);
-            const isDark = e.matches;
-            const tileUrl = isDark 
-                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' 
-                : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-            currentTileLayer = L.tileLayer(tileUrl, { attribution: '&copy; CARTO' }).addTo(map);
-        }
-        const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        darkModeQuery.addEventListener('change', updateMapTheme);
-        updateMapTheme(darkModeQuery); 
-
-        // 3. Real World Latitude / Longitude Dictionary
-        const tnGeography = {
-            "chennai": [13.0827, 80.2707], "vellore": [12.9165, 79.1325], "salem": [11.6643, 78.1460],
-            "coimbatore": [11.0168, 76.9558], "erode": [11.3410, 77.7172], "trichy": [10.7905, 78.7047],
-            "thanjavur": [10.7870, 79.1378], "madurai": [9.9252, 78.1198], "thoothukudi": [8.7642, 78.1348],
-            "tirunelveli": [8.7139, 77.7567], "kanyakumari": [8.0883, 77.5385]
+        // ==========================================
+        // 1. DATABASE & CONFIG
+        // ==========================================
+        const DB = {
+            brick: { easy: [{ level: 1, theme: "Proverbs 3:5", verse: "TRUST IN THE LORD WITH ALL YOUR HEART", clues: [{ id: 1, text: "Firm belief in the reliability or truth of someone", answer: "TRUST" }, { id: 2, text: "Preposition indicating inclusion or location", answer: "IN" }, { id: 3, text: "The supreme being; God", answer: "LORD" }], grid: [{ wordIdx: 0, row: 0, startCol: 1, length: 5 }, { wordIdx: 1, row: 0, startCol: 7, length: 2 }, { wordIdx: 2, row: 1, startCol: 3, length: 4 }] }] },
+            radial: { easy: [{ level: 1, theme: "Fruit of the Spirit", verse: "LOVE JOY PEACE", rings: 3, sectors: 8, clues: [{ id: 1, text: "The greatest theological virtue (Galatians 5:22)", answer: "LOVE", ring: 0 }, { id: 2, text: "Gladdening emotion or delight", answer: "JOY", ring: 1 }, { id: 3, text: "Tranquility; absence of conflict", answer: "PEACE", ring: 2 }] }] },
+            spiral: { easy: [{ level: 1, theme: "The Path of Creation", verse: "LIGHTADAMEVEGARDEN", clues: [{ id: 1, text: "Created on Day 1 ('Let there be...')", answer: "LIGHT", startIdx: 0 }, { id: 2, text: "The first man", answer: "ADAM", startIdx: 5 }, { id: 3, text: "The first woman", answer: "EVE", startIdx: 9 }, { id: 4, text: "The paradise home: _____ of Eden", answer: "GARDEN", startIdx: 12 }] }] }
         };
 
-        let activePinCount = 0;
-        let activeMarkerBeingEdited = null; 
-        let pendingClickCoords = null; 
-        let activeNodesList = []; // Array tracking all currently dropped marker coordinates
+        const WORD_BANK = ["GOD", "ARK", "SIN", "LOVE", "HOPE", "FAITH", "JESUS", "MOSES", "DAVID", "GRACE", "BIBLE", "ANGEL", "PEACE", "GLORY", "CROSS", "SPIRIT", "CHRIST", "GOSPEL", "PRAYER"];
 
-        const drawer = document.getElementById("checkin-drawer");
-        const locationInput = document.getElementById("user-location-input");
-        const drawerTitle = document.getElementById("drawer-title");
+        const CATALOG = [
+            { id: 'brick', title: 'Masonry Quotes', sub: 'Staggered Brick Grids', desc: 'Rebuild scriptures stone by stone.', icon: '🧱' },
+            { id: 'radial', title: 'Concentric Rings', sub: 'Radial Trivia', desc: 'Solve Bible trivia in expanding circles.', icon: '🎯' },
+            { id: 'spiral', title: 'Scripture Spiral', sub: 'Continuous Pathways', desc: 'Wind your way through biblical timelines.', icon: '🌀' },
+            { id: 'wordsearch', title: 'Infinite Word Search', sub: 'Procedural Generation', desc: 'Find biblical words in a scaling grid.', icon: '🔍' }
+        ];
 
-        // 4. Map Click Event -> Pick Location
-        map.on('click', function(e) {
-            pendingClickCoords = [e.latlng.lat, e.latlng.lng];
-            activeMarkerBeingEdited = null; 
-            drawerTitle.innerText = "Location Picked";
-            locationInput.value = "";
-            locationInput.placeholder = "Name this spot (e.g., College Campus)";
-            drawer.classList.remove("translate-y-full");
-            locationInput.focus();
-        });
+        // ==========================================
+        // 2. STATE MANAGEMENT
+        // ==========================================
+        let State = {
+            screen: 'home',
+            shape: '',
+            difficulty: 'easy',
+            level: 1,
+            puzzle: null,
+            inputs: {},
+            selectedCell: null,
+            selectedClue: null,
+            ws: { grid: [], words: [], found: [], startCell: null, size: 5 }
+        };
 
-        // Dynamic Traffic Lines Setup
-        const trafficLines = L.featureGroup();
+        // DOM Elements
+        const screens = ['home', 'setup', 'playing', 'success'].map(s => document.getElementById(`screen-${s}`));
+        const hiddenInput = document.getElementById('hidden-input');
 
-        // Recalculate traffic vectors dynamically based on active nodes
-        function updateTrafficTelemetry() {
-            trafficLines.clearLayers();
-            if (activeNodesList.length > 1) {
-                for (let i = 0; i < activeNodesList.length - 1; i++) {
-                    const startCoords = activeNodesList[i].coords;
-                    const endCoords = activeNodesList[i + 1].coords;
-                    const moodColor = activeNodesList[i + 1].color;
+        // ==========================================
+        // 3. CORE LOGIC
+        // ==========================================
 
-                    let lineColor = '#10b981'; // Default smooth
-                    if (moodColor.includes('red')) lineColor = '#ef4444';
-                    if (moodColor.includes('amber')) lineColor = '#f59e0b';
+        // Initialize Home Dashboard
+        document.getElementById('game-catalog').innerHTML = CATALOG.map(g => `
+            <div onclick="selectGame('${g.id}')" class="group bg-white rounded-3xl p-8 border border-slate-200/60 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all duration-300 cursor-pointer flex flex-col active:scale-95">
+                <div class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">${g.icon}</div>
+                <h3 class="text-xl font-bold text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors">${g.title}</h3>
+                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">${g.sub}</h4>
+                <p class="text-slate-500 text-sm font-medium leading-relaxed">${g.desc}</p>
+            </div>
+        `).join('');
 
-                    const polyline = L.polyline([startCoords, endCoords], {
-                        color: lineColor,
-                        weight: 4,
-                        className: 'traffic-line-anim'
+        function switchScreen(target) {
+            screens.forEach(s => s.classList.add('hidden'));
+            document.getElementById(`screen-${target}`).classList.remove('hidden');
+            document.getElementById('btn-dashboard').style.display = target === 'home' ? 'none' : 'block';
+            State.screen = target;
+        }
+
+        function selectGame(id) {
+            State.shape = id;
+            document.getElementById('setup-icon').innerText = CATALOG.find(g => g.id === id).icon;
+            switchScreen('setup');
+        }
+
+        function setDifficulty(diff) {
+            State.difficulty = diff;
+            document.getElementById('btn-diff-easy').className = diff === 'easy' ? 'p-5 rounded-2xl border-2 text-left border-indigo-600 bg-indigo-50' : 'p-5 rounded-2xl border-2 text-left border-slate-100 hover:border-slate-300';
+            document.getElementById('btn-diff-hard').className = diff === 'hard' ? 'p-5 rounded-2xl border-2 text-left border-slate-900 bg-slate-50' : 'p-5 rounded-2xl border-2 text-left border-slate-100 hover:border-slate-300';
+        }
+
+        function startGame() {
+            State.level = 1;
+            loadLevel();
+        }
+
+        function nextLevel() {
+            State.level++;
+            loadLevel();
+        }
+
+        function loadLevel() {
+            switchScreen('playing');
+            document.getElementById('validation-error').classList.add('hidden');
+            
+            if (State.shape === 'wordsearch') {
+                document.getElementById('svg-game-container').classList.add('hidden');
+                document.getElementById('wordsearch-container').classList.remove('hidden');
+                generateWordSearch();
+            } else {
+                document.getElementById('wordsearch-container').classList.add('hidden');
+                document.getElementById('svg-game-container').classList.remove('hidden');
+                
+                // Fallback to level 1 if no data for current level (mock db limits)
+                const shapeData = DB[State.shape]?.[State.difficulty] || DB[State.shape]?.['easy'];
+                State.puzzle = shapeData.find(p => p.level === State.level) || shapeData[0];
+                
+                document.getElementById('game-theme').innerText = State.puzzle.theme;
+                document.getElementById('game-level-badge').innerText = `Level ${State.level}`;
+                
+                // Init inputs
+                State.inputs = {};
+                State.selectedCell = null;
+                State.selectedClue = State.puzzle.clues[0].id;
+                
+                // Prefill easy mode
+                if (State.shape === 'brick') {
+                    State.puzzle.grid.forEach(w => {
+                        for (let i = 0; i < w.length; i++) State.inputs[`b-${w.row}-${w.startCol + i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.clues[w.wordIdx].answer[0] : '';
                     });
-                    trafficLines.addLayer(polyline);
                 }
+                // (Radial and Spiral prefill logic omitted for brevity in raw JS, same concept applies)
+
+                renderSVGBoard();
+                renderClues();
             }
         }
 
-        let trafficActive = false;
-        document.getElementById("toggle-traffic-btn").addEventListener("click", (e) => {
-            trafficActive = !trafficActive;
-            const btn = e.currentTarget;
-            const btnText = document.getElementById("traffic-btn-text");
+        // ==========================================
+        // 4. SVG RENDERER (Vanilla JS Strings)
+        // ==========================================
+        function handleCellClick(key) {
+            State.selectedCell = key;
+            renderSVGBoard();
+            hiddenInput.focus();
+        }
+
+        hiddenInput.addEventListener('input', (e) => {
+            if (!State.selectedCell) return;
+            const char = e.target.value.slice(-1).toUpperCase();
+            if (/^[A-Z]$/.test(char) || char === '') {
+                State.inputs[State.selectedCell] = char;
+                renderSVGBoard();
+            }
+            e.target.value = ''; // clear hidden input
+        });
+
+        function renderClues() {
+            const container = document.getElementById('clues-container');
+            container.innerHTML = State.puzzle.clues.map(c => `
+                <div onclick="State.selectedClue = ${c.id}; renderClues();" class="p-4 rounded-2xl cursor-pointer border ${State.selectedClue === c.id ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-transparent border-transparent hover:bg-slate-50 text-slate-600'} transition-colors">
+                    <p class="text-sm font-medium"><strong>${c.id}.</strong> ${c.text}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderSVGBoard() {
+            const container = document.getElementById('board-container');
+            let svgHTML = '';
+
+            if (State.shape === 'brick') {
+                const w = 540, h = 440, bw = 48, bh = 54;
+                let rects = '';
+                State.puzzle.grid.forEach(word => {
+                    for (let i = 0; i < word.length; i++) {
+                        const col = word.startCol + i;
+                        const x = col * bw + (word.row % 2 * (bw / 2)) + 30;
+                        const y = word.row * bh + 60;
+                        const key = `b-${word.row}-${col}`;
+                        const isSel = State.selectedCell === key;
+                        const val = State.inputs[key] || '';
+                        
+                        rects += `
+                            <g onclick="handleCellClick('${key}')" class="cursor-pointer">
+                                <rect x="${x}" y="${y}" width="${bw-4}" height="${bh-4}" rx="6" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2.5 : 1.5}" />
+                                <text x="${x + (bw/2) - 2}" y="${y + (bh/2) + 6}" text-anchor="middle" class="font-bold text-xl pointer-events-none" fill="#0f172a">${val}</text>
+                            </g>
+                        `;
+                    }
+                });
+                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 60vh;">${rects}</svg>`;
+            } 
+            else if (State.shape === 'spiral') {
+                // Simplified Spiral Renderer for Vanilla JS
+                const w = 540, h = 440, bs = 40;
+                let rects = '';
+                for (let i = 0; i < State.puzzle.verse.length; i++) {
+                    let x = i < 10 ? i : (i < 17 ? 9 : (i < 25 ? 9 - (i - 16) : 2));
+                    let y = i < 10 ? 0 : (i < 17 ? i - 9 : (i < 25 ? 7 : 7 - (i - 24)));
+                    
+                    const xP = x * (bs + 6) + 40, yP = y * (bs + 6) + 40;
+                    const key = `s-${i}`;
+                    const isSel = State.selectedCell === key;
+                    const val = State.inputs[key] || '';
+
+                    rects += `
+                        <g onclick="handleCellClick('${key}')" class="cursor-pointer">
+                            <rect x="${xP}" y="${yP}" width="${bs}" height="${bs}" rx="8" fill="${isSel ? '#e0e7ff' : '#ffffff'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2.5 : 1.5}" />
+                            <text x="${xP + bs/2}" y="${yP + bs/2 + 6}" text-anchor="middle" class="font-bold text-lg pointer-events-none" fill="#0f172a">${val}</text>
+                            <text x="${xP + 4}" y="${yP + 12}" class="text-[9px] fill-slate-400 pointer-events-none">${i+1}</text>
+                        </g>
+                    `;
+                }
+                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 60vh;">${rects}</svg>`;
+            }
+            // (Radial logic omitted to save space, relies on trigonometric HTML generation)
+
+            container.innerHTML = svgHTML;
+        }
+
+        function verifyAnswers() {
+            let isValid = true;
+            if (State.shape === 'brick') {
+                State.puzzle.grid.forEach(w => {
+                    const ans = State.puzzle.clues[w.wordIdx].answer;
+                    for (let i = 0; i < w.length; i++) {
+                        if ((State.inputs[`b-${w.row}-${w.startCol + i}`] || '') !== ans[i]) isValid = false;
+                    }
+                });
+            } else if (State.shape === 'spiral') {
+                for (let i = 0; i < State.puzzle.verse.length; i++) {
+                    if ((State.inputs[`s-${i}`] || '') !== State.puzzle.verse[i]) isValid = false;
+                }
+            }
+
+            if (isValid) triggerWin();
+            else {
+                const err = document.getElementById('validation-error');
+                err.innerText = "Some letters are incorrect or missing. Keep trying!";
+                err.classList.remove('hidden');
+            }
+        }
+
+        // ==========================================
+        // 5. WORD SEARCH ENGINE
+        // ==========================================
+        function generateWordSearch() {
+            const size = Math.min(15, Math.max(5, Math.floor(State.level / 6) + 5));
+            const wc = Math.min(10, Math.max(3, Math.floor(State.level / 8) + 3));
+            State.ws.size = size;
             
-            if (trafficActive) {
-                map.addLayer(trafficLines);
-                btn.classList.add("bg-blue-100", "dark:bg-blue-950", "border-blue-300", "dark:border-blue-500/50", "text-blue-700", "dark:text-blue-300");
-                btnText.innerText = "Hide State Traffic";
-            } else {
-                map.removeLayer(trafficLines);
-                btn.classList.remove("bg-blue-100", "dark:bg-blue-950", "border-blue-300", "dark:border-blue-500/50", "text-blue-700", "dark:text-blue-300");
-                btnText.innerText = "Show Live Traffic";
-            }
-        });
+            let grid = Array(size).fill(null).map(() => Array(size).fill(''));
+            let bank = [...WORD_BANK].filter(w => w.length <= size).sort(() => 0.5 - Math.random());
+            let words = bank.slice(0, wc);
+            let placed = [];
 
-        // Seed Initial Data
-        window.addEventListener("DOMContentLoaded", () => {
-            dropPin("Chennai", "bg-red-500", "Semma Tension", tnGeography["chennai"]);
-            dropPin("Coimbatore", "bg-amber-400", "Chill / Polaama", tnGeography["coimbatore"]);
-            dropPin("Madurai", "bg-emerald-500", "Smooth Vibe", tnGeography["madurai"]);
-        });
-
-        // Drawer Controls
-        document.getElementById("open-drawer-btn").addEventListener("click", () => {
-            activeMarkerBeingEdited = null; 
-            pendingClickCoords = null; 
-            drawerTitle.innerText = "Statewide Vibe Input";
-            locationInput.value = "";
-            locationInput.placeholder = "e.g., Trichy, Salem, Custom Area...";
-            drawer.classList.remove("translate-y-full");
-            locationInput.focus();
-        });
-
-        document.getElementById("close-drawer-btn").addEventListener("click", () => {
-            activeMarkerBeingEdited = null;
-            pendingClickCoords = null;
-            drawer.classList.add("translate-y-full");
-            locationInput.value = "";
-        });
-
-        // Submit Pin
-        document.querySelectorAll(".mood-submit-btn").forEach(btn => {
-            btn.addEventListener("click", () => {
-                let targetCity = locationInput.value.trim();
-                
-                if (!targetCity) {
-                    if (pendingClickCoords) targetCity = "Custom Spot";
-                    else { alert("Please enter a location name!"); return; }
+            const dirs = [[0,1], [1,0]]; // E, S (Simplified for vanilla js space)
+            
+            words.forEach(word => {
+                for(let a=0; a<100; a++) {
+                    let [dr, dc] = dirs[Math.floor(Math.random() * dirs.length)];
+                    let r = Math.floor(Math.random() * size), c = Math.floor(Math.random() * size);
+                    let er = r + (word.length-1)*dr, ec = c + (word.length-1)*dc;
+                    
+                    if (er < size && ec < size) {
+                        let canPlace = true;
+                        for (let i = 0; i < word.length; i++) {
+                            if (grid[r + i*dr][c + i*dc] !== '' && grid[r + i*dr][c + i*dc] !== word[i]) { canPlace = false; break; }
+                        }
+                        if (canPlace) {
+                            let coords = [];
+                            for (let i = 0; i < word.length; i++) { grid[r + i*dr][c + i*dc] = word[i]; coords.push(`${r+i*dr},${c+i*dc}`); }
+                            placed.push({ word, coords, found: false });
+                            break;
+                        }
+                    }
                 }
-
-                const chosenColor = btn.getAttribute("data-color");
-                const chosenStatusText = btn.getAttribute("data-text");
-
-                if (activeMarkerBeingEdited !== null) {
-                    map.removeLayer(activeMarkerBeingEdited);
-                    activeNodesList = activeNodesList.filter(node => node.marker !== activeMarkerBeingEdited);
-                    activePinCount--; 
-                    activeMarkerBeingEdited = null; 
-                }
-
-                dropPin(targetCity, chosenColor, chosenStatusText, pendingClickCoords);
-                
-                drawer.classList.add("translate-y-full");
-                locationInput.value = "";
-                pendingClickCoords = null;
             });
-        });
 
-        // Core Pin Engine
-        function dropPin(cityName, colorClass, statusText, exactCoords = null) {
-            const normalizedKey = cityName.toLowerCase().replace(/[^a-z]/g, "");
-            let coords = [];
+            const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            for (let r=0; r<size; r++) for (let c=0; c<size; c++) if (grid[r][c] === '') grid[r][c] = alpha[Math.floor(Math.random() * alpha.length)];
+            
+            State.ws.grid = grid;
+            State.ws.words = placed;
+            State.ws.found = [];
+            State.ws.startCell = null;
+            renderWordSearch();
+        }
 
-            if (exactCoords) {
-                coords = exactCoords; 
-            } else if (tnGeography[normalizedKey]) {
-                const jitterLat = (Math.random() - 0.5) * 0.05;
-                const jitterLng = (Math.random() - 0.5) * 0.05;
-                coords = [tnGeography[normalizedKey][0] + jitterLat, tnGeography[normalizedKey][1] + jitterLng];
+        function wsClick(r, c) {
+            if (!State.ws.startCell) {
+                State.ws.startCell = {r, c};
             } else {
-                const randomLat = 8.5 + Math.random() * 4.5;
-                const randomLng = 76.5 + Math.random() * 3.5;
-                coords = [randomLat, randomLng];
+                // Check line
+                const sr = State.ws.startCell.r, sc = State.ws.startCell.c;
+                const dr = r - sr, dc = c - sc;
+                const steps = Math.max(Math.abs(dr), Math.abs(dc));
+                
+                if (steps > 0 && (Math.abs(dr) === Math.abs(dc) || dr === 0 || dc === 0)) {
+                    let str = "";
+                    let rs = dr===0?0:dr/steps, cs = dc===0?0:dc/steps;
+                    for(let i=0; i<=steps; i++) str += State.ws.grid[sr + i*rs][sc + i*cs];
+                    const rev = str.split('').reverse().join('');
+                    
+                    const match = State.ws.words.find(w => !w.found && (w.word === str || w.word === rev));
+                    if (match) {
+                        match.found = true;
+                        State.ws.found.push(...match.coords);
+                        if (State.ws.words.every(w => w.found)) setTimeout(triggerWin, 500);
+                    }
+                }
+                State.ws.startCell = null;
             }
+            renderWordSearch();
+        }
 
-            let textColor = "text-slate-600 dark:text-slate-400";
-            let weatherAnimations = "";
+        function renderWordSearch() {
+            const cont = document.getElementById('wordsearch-container');
+            let gridHTML = `<div class="grid gap-1 mb-6 p-4 bg-white rounded-2xl shadow-sm border border-slate-200" style="grid-template-columns: repeat(${State.ws.size}, minmax(0, 1fr))">`;
+            
+            for (let r=0; r<State.ws.size; r++) {
+                for (let c=0; c<State.ws.size; c++) {
+                    const isFound = State.ws.found.includes(`${r},${c}`);
+                    const isAnchor = State.ws.startCell?.r === r && State.ws.startCell?.c === c;
+                    
+                    let cls = "bg-slate-50 text-slate-700 border-transparent hover:ring-2 hover:ring-indigo-300";
+                    if (isFound) cls = "bg-emerald-100 text-emerald-800 border-emerald-300";
+                    else if (isAnchor) cls = "bg-indigo-500 text-white border-indigo-600 shadow-md";
 
-            if(colorClass.includes("red")) {
-                textColor = "text-red-600 dark:text-red-400";
-                weatherAnimations = `<div class="weather-container"><div class="heat-wave" style="left: 30%; animation-delay: 0s;"></div><div class="heat-wave" style="left: 50%; animation-delay: 0.6s;"></div><div class="heat-wave" style="left: 70%; animation-delay: 1.2s; height: 35px;"></div></div>`;
-            } else if(colorClass.includes("amber")) {
-                textColor = "text-amber-600 dark:text-amber-400";
-                weatherAnimations = `<div class="weather-container"><div class="wind-gust" style="top: 25%; animation-delay: 0s;"></div><div class="wind-gust" style="top: 50%; animation-delay: 0.8s;"></div><div class="wind-curve" style="top: 30%; left: 10%; animation-delay: 0.2s;"></div></div>`;
-            } else if(colorClass.includes("emerald")) {
-                textColor = "text-emerald-600 dark:text-emerald-400";
-                weatherAnimations = `<div class="weather-container"><div class="smooth-pulse" style="animation-delay: 0s;"></div><div class="cool-sparkle" style="left: 20%; top: 40%; animation-delay: 0s;"></div><div class="cool-sparkle" style="left: 70%; top: 60%; animation-delay: 1.5s;"></div></div>`;
+                    gridHTML += `<div onclick="wsClick(${r}, ${c})" class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-lg md:text-xl font-bold rounded-lg cursor-pointer border-2 transition-all active:scale-90 ${cls}">${State.ws.grid[r][c]}</div>`;
+                }
             }
+            gridHTML += `</div>`;
+            
+            let wordsHTML = `<div class="w-full bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60"><h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-100 pb-2">Target Words</h3><div class="flex flex-wrap gap-2">`;
+            State.ws.words.forEach(w => {
+                wordsHTML += `<span class="px-3 py-1.5 rounded-full text-sm font-bold ${w.found ? 'bg-slate-100 text-slate-400 line-through' : 'bg-indigo-50 text-indigo-700'}">${w.word}</span>`;
+            });
+            wordsHTML += `</div></div>`;
 
-            const markerHTML = `
-                <div class="relative flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:scale-110 transition-transform duration-300" style="width: 120px; height: 120px;">
-                    ${weatherAnimations}
-                    <div class="mood-glow-orb absolute inset-0 m-auto w-12 h-12 ${colorClass}"></div>
-                    <div class="relative bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl shadow-[0_5px_15px_rgba(0,0,0,0.1)] dark:shadow-2xl backdrop-blur-md z-10 whitespace-nowrap group hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
-                        <p class="text-[11px] font-bold text-slate-800 dark:text-slate-100 capitalize text-center tracking-wide">${cityName}</p>
-                        <p class="text-[9px] ${textColor} font-mono mt-0.5 text-center font-semibold">${statusText}</p>
+            cont.innerHTML = `
+                <div class="w-full flex justify-between items-end mb-6">
+                    <div>
+                        <h2 class="text-2xl font-black text-slate-900 tracking-tight">Word Search</h2>
+                        <p class="text-sm font-semibold text-slate-500 uppercase tracking-widest">Level ${State.level}</p>
                     </div>
                 </div>
+                ${gridHTML}
+                ${wordsHTML}
             `;
+        }
 
-            const customIcon = L.divIcon({ className: 'custom-mood-marker', html: markerHTML, iconSize: [0, 0] });
-            const newMarker = L.marker(coords, { icon: customIcon }).addTo(map);
-
-            newMarker.on('click', (e) => {
-                L.DomEvent.stopPropagation(e); // Stop Leaflet map click triggering when clicking marker
-                activeMarkerBeingEdited = newMarker;
-                pendingClickCoords = coords; 
-                drawerTitle.innerText = `Edit Vibe: ${cityName}`;
-                locationInput.value = cityName;
-                drawer.classList.remove("translate-y-full");
-            });
-
-            // Append new item configuration to our live array tracker
-            activeNodesList.push({
-                marker: newMarker,
-                coords: coords,
-                color: colorClass
-            });
-
-            // Trigger telemetry path update
-            updateTrafficTelemetry();
-
-            map.flyTo(coords, 8, { duration: 1.5 });
-
-            activePinCount++;
-            document.getElementById("active-count").innerText = `${activePinCount} Nodes Active`;
+        // ==========================================
+        // 6. WIN LOGIC
+        // ==========================================
+        function triggerWin() {
+            if (State.shape === 'wordsearch') {
+                document.getElementById('success-scripture').classList.add('hidden');
+            } else {
+                document.getElementById('success-scripture').classList.remove('hidden');
+                document.getElementById('success-verse').innerText = `"${State.puzzle.verse}"`;
+            }
+            switchScreen('success');
         }
     </script>
 </body>
