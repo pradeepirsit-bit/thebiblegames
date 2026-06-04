@@ -19,8 +19,7 @@
             gap: 2px; 
             justify-content: center; 
             background: #fff; 
-            padding: 20px; 
-            border-radius: 50%;
+            padding: 20px;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
     </style>
@@ -133,12 +132,14 @@
 
         const CATALOG = [
             { id: 'spot', title: 'Spot the Fake', sub: 'Discernment', desc: 'Identify the verse that is actually a misquote or cultural saying.', icon: '👁️' },
+            { id: 'scrabble', title: 'Scripture Scrabble', sub: 'Interlocking Grids', desc: 'Connect Bible words in an automated crossword layout.', icon: '🎲' },
             { id: 'brick', title: 'Masonry Quotes', sub: 'Staggered Grids', desc: 'Rebuild dynamic API scriptures stone by stone.', icon: '🧱' },
             { id: 'row', title: 'Scripture Rows', sub: 'Stacked Lines', desc: 'Solve horizontal lines of text stacked top to bottom.', icon: '📝' },
             { id: 'radial', title: 'Concentric Rings', sub: 'Radial Trivia', desc: 'Solve API Bible words in expanding circles.', icon: '🎯' },
             { id: 'spiral', title: 'Scripture Spiral', sub: 'Colorful Pathways', desc: 'Wind your way through vibrant, color-coded timelines.', icon: '🌀' },
             { id: 'wordsearch', title: 'Circular Search', sub: 'Procedural Gen', desc: 'Find 20-100 words in a massive circular polar grid.', icon: '🔍' },
-            { id: 'flower', title: 'Word Flower', sub: 'Blooming Scriptures', desc: 'Find words organically blooming in a 6-petal grid.', icon: '🌸' }
+            { id: 'flower', title: 'Word Flower', sub: 'Blooming Scriptures', desc: 'Find words organically blooming in a 6-petal grid.', icon: '🌸' },
+            { id: 'squaresearch', title: 'Square Search', sub: 'Classic Grid', desc: 'Find words hidden in a traditional square matrix.', icon: '🔠' }
         ];
 
         let State = {
@@ -190,7 +191,7 @@
             document.getElementById('svg-game-container').classList.add('hidden');
             document.getElementById('api-loading').classList.remove('hidden');
             
-            if (State.shape === 'wordsearch' || State.shape === 'flower') {
+            if (['wordsearch', 'flower', 'squaresearch'].includes(State.shape)) {
                 await generateGridGame(State.shape);
                 document.getElementById('api-loading').classList.add('hidden');
                 document.getElementById('wordsearch-container').classList.remove('hidden');
@@ -232,7 +233,7 @@
         }
 
         // ======================================================================
-        // DYNAMIC API DATA GENERATION (Brick, Row, Radial)
+        // DYNAMIC API DATA GENERATION (Brick, Row, Radial, Scrabble)
         // ======================================================================
         async function generateDynamicPuzzle(shape) {
             const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
@@ -245,11 +246,10 @@
             } catch (e) { console.log("API fallback used."); }
 
             let words = verse.split(/\s+/).filter(w => w.length > 2);
-            if (words.length > 10) words = words.slice(0, 10);
+            if (words.length > 10 && shape !== 'scrabble') words = words.slice(0, 10);
+            if (shape === 'scrabble') words = [...new Set(words)]; // unique words for crossword
 
-            let clues = words.map((w, i) => ({ id: i+1, text: `Word from passage: ${w}`, answer: w }));
-
-            let puzzle = { theme: ref, verse: verse, fullText: verse, clues: clues };
+            let puzzle = { theme: ref, verse: verse, fullText: verse, clues: [] };
 
             if (shape === 'brick') {
                 let grid = [];
@@ -260,15 +260,86 @@
                     colOffset += w.length + 1;
                 });
                 puzzle.grid = grid;
-            } else if (shape === 'row') {
+                puzzle.clues = words.map((w, i) => ({ id: i+1, text: `Word from passage: ${w}`, answer: w }));
+            } 
+            else if (shape === 'row') {
                 let grid = [];
                 words.forEach((w, i) => {
                     grid.push({ wordIdx: i, row: i, length: w.length });
                 });
                 puzzle.grid = grid;
-            } else if (shape === 'radial') {
-                clues.forEach((c, i) => { c.ring = i % 3; });
+                puzzle.clues = words.map((w, i) => ({ id: i+1, text: `Word from passage: ${w}`, answer: w }));
+            } 
+            else if (shape === 'radial') {
+                puzzle.clues = words.map((w, i) => ({ id: i+1, text: `Word from passage: ${w}`, answer: w, ring: i%3 }));
                 puzzle.sectors = 12;
+            }
+            else if (shape === 'scrabble') {
+                // Crossword generator logic
+                let placedWords = [];
+                let board = Array(40).fill(null).map(() => Array(40).fill(null));
+                words.sort((a,b) => b.length - a.length); 
+
+                function canPlace(word, r, c, dir) {
+                    if (dir === 'H') {
+                        if (c < 0 || c + word.length > 40) return false;
+                        for (let i = 0; i < word.length; i++) {
+                            if (board[r][c+i] !== null && board[r][c+i] !== word[i]) return false;
+                            if (board[r][c+i] === null) {
+                                if (r>0 && board[r-1][c+i] !== null) return false;
+                                if (r<39 && board[r+1][c+i] !== null) return false;
+                            }
+                        }
+                        if (c > 0 && board[r][c-1] !== null) return false;
+                        if (c + word.length < 40 && board[r][c+word.length] !== null) return false;
+                    } else {
+                        if (r < 0 || r + word.length > 40) return false;
+                        for (let i = 0; i < word.length; i++) {
+                            if (board[r+i][c] !== null && board[r+i][c] !== word[i]) return false;
+                            if (board[r+i][c] === null) {
+                                if (c>0 && board[r+i][c-1] !== null) return false;
+                                if (c<39 && board[r+i][c+1] !== null) return false;
+                            }
+                        }
+                        if (r > 0 && board[r-1][c] !== null) return false;
+                        if (r + word.length < 40 && board[r+word.length][c] !== null) return false;
+                    }
+                    return true;
+                }
+
+                if(words.length > 0) {
+                    let first = words.shift();
+                    let startC = 20 - Math.floor(first.length/2);
+                    for(let i=0; i<first.length; i++) board[20][startC+i] = first[i];
+                    placedWords.push({word: first, r: 20, c: startC, dir: 'H', id: 1});
+
+                    let clueId = 2;
+                    words.forEach(w => {
+                        let placed = false;
+                        for (let i = 0; i < w.length && !placed; i++) {
+                            let letter = w[i];
+                            for (let pr = 0; pr < 40 && !placed; pr++) {
+                                for (let pc = 0; pc < 40 && !placed; pc++) {
+                                    if (board[pr][pc] === letter) {
+                                        if (canPlace(w, pr, pc - i, 'H')) {
+                                            for(let j=0; j<w.length; j++) board[pr][pc-i+j] = w[j];
+                                            placedWords.push({word: w, r: pr, c: pc-i, dir: 'H', id: clueId++});
+                                            placed = true;
+                                        }
+                                        else if (canPlace(w, pr - i, pc, 'V')) {
+                                            for(let j=0; j<w.length; j++) board[pr-i+j][pc] = w[j];
+                                            placedWords.push({word: w, r: pr-i, c: pc, dir: 'V', id: clueId++});
+                                            placed = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                puzzle.placedWords = placedWords;
+                puzzle.clues = placedWords.map(pw => ({ id: pw.id, text: `Word from passage`, answer: pw.word }));
             }
 
             State.puzzle = puzzle;
@@ -284,7 +355,7 @@
             
             State.inputs = {};
             State.selectedCell = null;
-            State.selectedClue = State.puzzle.clues ? State.puzzle.clues[0]?.id : null;
+            State.selectedClue = State.puzzle.clues && State.puzzle.clues.length ? State.puzzle.clues[0].id : null;
             
             if (State.shape === 'brick') {
                 State.puzzle.grid.forEach(w => { for (let i = 0; i < w.length; i++) State.inputs[`b-${w.row}-${w.startCol + i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.clues[w.wordIdx].answer[0] : ''; });
@@ -294,6 +365,18 @@
                 State.puzzle.clues.forEach(c => { for (let i = 0; i < c.answer.length; i++) State.inputs[`r-${c.ring}-${i}`] = (State.difficulty === 'easy' && i === 0) ? c.answer[0] : ''; });
             } else if (State.shape === 'spiral') {
                 State.puzzle.clues.forEach(c => { for (let i = 0; i < c.answer.length; i++) State.inputs[`s-${c.startIdx + i}`] = (State.difficulty === 'easy' && i === 0) ? c.answer[0] : ''; });
+            } else if (State.shape === 'scrabble') {
+                State.puzzle.placedWords.forEach(pw => {
+                    for(let i = 0; i < pw.word.length; i++) {
+                        let r = pw.dir === 'H' ? pw.r : pw.r + i;
+                        let c = pw.dir === 'H' ? pw.c + i : pw.c;
+                        if (State.difficulty === 'easy' && i === 0) {
+                            State.inputs[`sc-${r}-${c}`] = pw.word[0];
+                        } else if (State.inputs[`sc-${r}-${c}`] === undefined) {
+                            State.inputs[`sc-${r}-${c}`] = '';
+                        }
+                    }
+                });
             } else if (State.shape === 'spot') {
                 State.inputs['spot'] = null;
             }
@@ -329,7 +412,7 @@
                 let clueText = c.text + ` <span class="text-indigo-500 font-bold">(${c.answer.length} letters)</span>`;
                 return `
                 <div onclick="State.selectedClue = ${c.id}; renderClues();" class="p-3 rounded-xl cursor-pointer border ${State.selectedClue === c.id ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-transparent border-transparent hover:bg-slate-50 text-slate-600'} transition-colors">
-                    <p class="text-sm font-medium"><strong>${c.id}.</strong> ${clueText}</p>
+                    <p class="text-sm font-medium"><strong>${c.id}. ${State.shape === 'scrabble' ? c.answer : ''}</strong> ${State.shape !== 'scrabble' ? clueText : ''}</p>
                 </div>
             `}).join('');
         }
@@ -357,7 +440,7 @@
                 });
                 html += '</div>';
                 container.innerHTML = html;
-                return; // Return early since Spot doesn't use SVG
+                return;
             }
 
             if (State.shape === 'brick') {
@@ -394,6 +477,53 @@
                                 <text x="${x + bs/2}" y="${y + bs/2 + 6}" text-anchor="middle" class="font-bold text-lg pointer-events-none" fill="#0f172a">${val}</text>
                             </g>
                         `;
+                    }
+                });
+                svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 50vh;">${rects}</svg>`;
+            }
+            else if (State.shape === 'scrabble') {
+                // Find bounds
+                let minR = 40, maxR = 0, minC = 40, maxC = 0;
+                State.puzzle.placedWords.forEach(pw => {
+                    if (pw.dir === 'H') {
+                        minR = Math.min(minR, pw.r); maxR = Math.max(maxR, pw.r);
+                        minC = Math.min(minC, pw.c); maxC = Math.max(maxC, pw.c + pw.word.length - 1);
+                    } else {
+                        minC = Math.min(minC, pw.c); maxC = Math.max(maxC, pw.c);
+                        minR = Math.min(minR, pw.r); maxR = Math.max(maxR, pw.r + pw.word.length - 1);
+                    }
+                });
+                
+                const cols = (maxC - minC + 1);
+                const rows = (maxR - minR + 1);
+                const bs = Math.min(42, Math.floor(560 / cols), Math.floor(460 / rows));
+                const w = 600, h = 500;
+                const startX = (w - (cols * bs)) / 2;
+                const startY = (h - (rows * bs)) / 2;
+
+                let rects = '';
+                let drawnCells = {}; // Avoid drawing intersections twice
+                
+                State.puzzle.placedWords.forEach(pw => {
+                    for (let i = 0; i < pw.word.length; i++) {
+                        let r = pw.dir === 'H' ? pw.r : pw.r + i;
+                        let c = pw.dir === 'H' ? pw.c + i : pw.c;
+                        let key = `sc-${r}-${c}`;
+                        
+                        if (!drawnCells[key]) {
+                            drawnCells[key] = true;
+                            const x = startX + (c - minC) * bs;
+                            const y = startY + (r - minR) * bs;
+                            const isSel = State.selectedCell === key;
+                            const val = State.inputs[key] || '';
+                            
+                            rects += `
+                                <g onclick="handleCellClick('${key}')" class="cursor-pointer">
+                                    <rect x="${x+1}" y="${y+1}" width="${bs-2}" height="${bs-2}" rx="4" fill="${isSel ? '#e0e7ff' : '#f8fafc'}" stroke="${isSel ? '#6366f1' : '#cbd5e1'}" stroke-width="${isSel ? 2 : 1}" />
+                                    <text x="${x + bs/2}" y="${y + bs/2 + 5}" text-anchor="middle" class="font-bold ${bs < 25 ? 'text-sm' : 'text-lg'} pointer-events-none" fill="#0f172a">${val}</text>
+                                </g>
+                            `;
+                        }
                     }
                 });
                 svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 50vh;">${rects}</svg>`;
@@ -464,7 +594,7 @@
         }
 
         // ======================================================================
-        // GRID GAME ENGINE (Handles both Word Search & Word Flower)
+        // GRID GAME ENGINE (Handles Word Search, Square Search, Word Flower)
         // ======================================================================
         async function generateGridGame(shape) {
             const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
@@ -487,9 +617,10 @@
 
             const targetWords = Math.min(100, Math.max(20, 20 + Math.floor((State.level - 1) * 2.75)));
             
-            // Adjust size to account for the flower curve losing boundary area vs a perfect circle
+            // Adjust sizes
             let size = Math.min(40, Math.max(16, Math.floor(Math.sqrt(targetWords * 10)))); 
             if (shape === 'flower') size = Math.floor(size * 1.35);
+            if (shape === 'squaresearch') size = Math.floor(size * 0.85); // Square has more dense area
 
             State.ws.size = size;
             const center = size / 2 - 0.5;
@@ -508,6 +639,8 @@
                         const angle = Math.atan2(dy, dx);
                         const maxDist = (size / 2 - 1) * (0.7 + 0.3 * Math.cos(6 * angle)); 
                         if (dist <= maxDist) grid[r][c] = '';
+                    } else if (shape === 'squaresearch') {
+                        grid[r][c] = ''; // Full boundary
                     }
                 }
             }
@@ -599,7 +732,11 @@
             const cellW = State.ws.size > 20 ? 'w-5 h-5 text-xs' : 'w-7 h-7 md:w-8 md:h-8 text-sm md:text-base';
             
             const isFlower = State.shape === 'flower';
-            const titleText = isFlower ? 'Word Flower' : 'Circular Word Search';
+            const isSquare = State.shape === 'squaresearch';
+            
+            let titleText = 'Circular Word Search';
+            if(isFlower) titleText = 'Word Flower';
+            if(isSquare) titleText = 'Square Word Search';
             
             const baseCls = isFlower ? "bg-rose-50 text-rose-800 hover:ring-2 hover:ring-pink-400" : "bg-slate-50 text-slate-700 hover:ring-2 hover:ring-indigo-300";
             const foundCls = isFlower ? "bg-pink-300 text-pink-900 border-pink-400 shadow-sm" : "bg-emerald-100 text-emerald-800 border-emerald-300";
@@ -608,7 +745,7 @@
             const wordNotFoundCls = isFlower ? "bg-pink-100 text-pink-800 border border-pink-200" : "bg-indigo-50 text-indigo-700 border border-indigo-100";
             const verseBg = isFlower ? "bg-pink-50 border border-pink-200 text-pink-900" : "bg-indigo-50 border border-indigo-100 text-indigo-900";
 
-            let gridHTML = `<div class="circular-grid mb-6 mx-auto overflow-hidden ${isFlower ? 'shadow-pink-900/10' : ''}" style="grid-template-columns: repeat(${State.ws.size}, minmax(0, 1fr))">`;
+            let gridHTML = `<div class="circular-grid mb-6 mx-auto overflow-hidden ${isFlower ? 'shadow-pink-900/10' : ''} ${isSquare ? 'rounded-2xl' : 'rounded-full'}" style="grid-template-columns: repeat(${State.ws.size}, minmax(0, 1fr))">`;
             
             for (let r=0; r<State.ws.size; r++) {
                 for (let c=0; c<State.ws.size; c++) {
@@ -625,7 +762,10 @@
                     if (isFound) cls = foundCls;
                     else if (isAnchor) cls = anchorCls;
 
-                    gridHTML += `<div onclick="wsClick(${r}, ${c})" class="${cellW} flex items-center justify-center font-bold rounded-full cursor-pointer transition-all active:scale-90 ${cls}">${char}</div>`;
+                    // Make cells square if square search, round otherwise
+                    const cellShape = isSquare ? 'rounded-md' : 'rounded-full';
+
+                    gridHTML += `<div onclick="wsClick(${r}, ${c})" class="${cellW} flex items-center justify-center font-bold ${cellShape} cursor-pointer transition-all active:scale-90 ${cls}">${char}</div>`;
                 }
             }
             gridHTML += `</div>`;
@@ -659,7 +799,7 @@
         // ======================================================================
         function showAnswers() {
             State.usedShowAnswers = true;
-            if (State.shape === 'wordsearch' || State.shape === 'flower') {
+            if (['wordsearch', 'flower', 'squaresearch'].includes(State.shape)) {
                 State.ws.words.forEach(w => { w.found = true; State.ws.found.push(...w.coords); });
                 renderGridGame();
                 setTimeout(triggerWin, 1500); 
@@ -669,20 +809,30 @@
                 renderSVGBoard();
                 setTimeout(triggerWin, 1500);
             } else {
-                if (State.shape === 'brick' || State.shape === 'radial' || State.shape === 'row') {
-                    State.puzzle.clues.forEach(c => {
-                        for (let i = 0; i < c.answer.length; i++) {
-                            if(State.shape === 'brick') {
-                                const wInfo = State.puzzle.grid.find(g => g.wordIdx === c.id - 1);
-                                if(wInfo) State.inputs[`b-${wInfo.row}-${wInfo.startCol + i}`] = c.answer[i];
-                            } else if (State.shape === 'row') {
-                                const wInfo = State.puzzle.grid.find(g => g.wordIdx === c.id - 1);
-                                if(wInfo) State.inputs[`rw-${wInfo.row}-${i}`] = c.answer[i];
-                            } else {
-                                State.inputs[`r-${c.ring}-${i}`] = c.answer[i];
+                if (['brick', 'radial', 'row', 'scrabble'].includes(State.shape)) {
+                    if (State.shape === 'scrabble') {
+                        State.puzzle.placedWords.forEach(pw => {
+                            for(let i=0; i<pw.word.length; i++) {
+                                let r = pw.dir === 'H' ? pw.r : pw.r + i;
+                                let c = pw.dir === 'H' ? pw.c + i : pw.c;
+                                State.inputs[`sc-${r}-${c}`] = pw.word[i];
                             }
-                        }
-                    });
+                        });
+                    } else {
+                        State.puzzle.clues.forEach(c => {
+                            for (let i = 0; i < c.answer.length; i++) {
+                                if(State.shape === 'brick') {
+                                    const wInfo = State.puzzle.grid.find(g => g.wordIdx === c.id - 1);
+                                    if(wInfo) State.inputs[`b-${wInfo.row}-${wInfo.startCol + i}`] = c.answer[i];
+                                } else if (State.shape === 'row') {
+                                    const wInfo = State.puzzle.grid.find(g => g.wordIdx === c.id - 1);
+                                    if(wInfo) State.inputs[`rw-${wInfo.row}-${i}`] = c.answer[i];
+                                } else {
+                                    State.inputs[`r-${c.ring}-${i}`] = c.answer[i];
+                                }
+                            }
+                        });
+                    }
                 } else if (State.shape === 'spiral') {
                     for (let i = 0; i < State.puzzle.verse.length; i++) State.inputs[`s-${i}`] = State.puzzle.verse[i];
                 }
@@ -716,6 +866,14 @@
                         if ((State.inputs[`r-${c.ring}-${i}`] || '') !== c.answer[i]) isValid = false;
                     }
                 });
+            } else if (State.shape === 'scrabble') {
+                State.puzzle.placedWords.forEach(pw => {
+                    for(let i = 0; i < pw.word.length; i++) {
+                        let r = pw.dir === 'H' ? pw.r : pw.r + i;
+                        let c = pw.dir === 'H' ? pw.c + i : pw.c;
+                        if ((State.inputs[`sc-${r}-${c}`] || '') !== pw.word[i]) isValid = false;
+                    }
+                });
             } else if (State.shape === 'spiral') {
                 for (let i = 0; i < State.puzzle.verse.length; i++) {
                     if ((State.inputs[`s-${i}`] || '') !== State.puzzle.verse[i]) isValid = false;
@@ -738,7 +896,7 @@
             }
 
             document.getElementById('success-level-num').innerText = State.level;
-            if (State.shape === 'wordsearch' || State.shape === 'flower') {
+            if (['wordsearch', 'flower', 'squaresearch'].includes(State.shape)) {
                 document.getElementById('success-scripture').classList.add('hidden');
             } else if (State.shape === 'spot') {
                 const fake = State.puzzle.options.find(o => o.isFake);
