@@ -117,7 +117,6 @@
     </main>
 
     <script>
-        // API References Pool
         const API_VERSE_REFS = [
             "John 3:16", "Genesis 1:1", "Psalm 23:1", "Romans 8:28", "Philippians 4:13", 
             "Proverbs 3:5", "Isaiah 40:31", "Matthew 28:19", "Jeremiah 29:11", "Ephesians 2:8", 
@@ -125,7 +124,6 @@
             "Romans 12:2", "Joshua 1:9", "Matthew 6:33", "Proverbs 16:3", "Isaiah 41:10"
         ];
 
-        // Static fallback for Spiral
         const SPIRAL_DB = {
             easy: [{ level: 1, theme: "The Path of Creation", verse: "LIGHTADAMEVEGARDEN", clues: [{ id: 1, text: "Created on Day 1", answer: "LIGHT", startIdx: 0 }, { id: 2, text: "The first man", answer: "ADAM", startIdx: 5 }, { id: 3, text: "The first woman", answer: "EVE", startIdx: 9 }, { id: 4, text: "Paradise home", answer: "GARDEN", startIdx: 12 }] }]
         };
@@ -137,6 +135,8 @@
             { id: 'row', title: 'Scripture Rows', sub: 'Stacked Lines', desc: 'Solve horizontal lines of text stacked top to bottom.', icon: '📝' },
             { id: 'radial', title: 'Concentric Rings', sub: 'Radial Trivia', desc: 'Solve API Bible words in expanding circles.', icon: '🎯' },
             { id: 'spiral', title: 'Scripture Spiral', sub: 'Colorful Pathways', desc: 'Wind your way through vibrant, color-coded timelines.', icon: '🌀' },
+            { id: 'emojiguess', title: 'Bible Emoji Guess', sub: 'Visual Clues', desc: 'Decode biblical stories or verses represented entirely by emojis.', icon: '🧩' },
+            { id: 'versebuilder', title: 'Bible Verse Builder', sub: 'Word Mechanics', desc: 'Rebuild a scrambled verse fetched dynamically from the Bible API in correct sequence.', icon: '🏗️' },
             { id: 'wordsearch', title: 'Circular Search', sub: 'Procedural Gen', desc: 'Find 20-100 words in a massive circular polar grid.', icon: '🔍' },
             { id: 'flower', title: 'Word Flower', sub: 'Blooming Scriptures', desc: 'Find words organically blooming in a 6-petal grid.', icon: '🌸' },
             { id: 'squaresearch', title: 'Square Search', sub: 'Classic Grid', desc: 'Find words hidden in a traditional square matrix.', icon: '🔠' }
@@ -151,7 +151,6 @@
         const screens = ['home', 'setup', 'playing', 'success'].map(s => document.getElementById(`screen-${s}`));
         const hiddenInput = document.getElementById('hidden-input');
 
-        // Init UI
         document.getElementById('game-catalog').innerHTML = CATALOG.map(g => `
             <div onclick="selectGame('${g.id}')" class="group bg-white rounded-3xl p-8 border border-slate-200/60 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all duration-300 cursor-pointer flex flex-col active:scale-95">
                 <div class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">${g.icon}</div>
@@ -201,11 +200,87 @@
             } else if (State.shape === 'spot') {
                 await generateSpotGame();
                 setupSVGGame();
+            } else if (State.shape === 'emojiguess') {
+                await generateEmojiGame();
+                setupSVGGame();
+            } else if (State.shape === 'versebuilder') {
+                await generateVerseBuilderGame();
+                setupSVGGame();
             } else {
                 await generateDynamicPuzzle(State.shape);
                 setupSVGGame();
             }
         }
+
+        // ======================================================================
+        // NEW GAME TYPE: BIBLE EMOJI GUESS
+        // ======================================================================
+        async function generateEmojiGame() {
+            const emojiPool = [
+                { ref: "John 3:16", emojis: "🌍 ❤️ 🕊️ ✝️", answer: "LOVED", hint: "What God did to the world" },
+                { ref: "Genesis 1:1", emojis: "🌌 🌎 ✨ 🌱", answer: "CREATED", hint: "Action done in the beginning" },
+                { ref: "Psalm 23:1", emojis: "🐑 🌿 💧 🥖", answer: "SHEPHERD", hint: "The Lord is my..." },
+                { ref: "Matthew 4:19", emojis: "🎣 👥 🌊 ⛵", answer: "FISHERS", hint: "I will make you ___ of men" },
+                { ref: "Proverbs 3:5", emojis: "🧠 ❌ ❤️ 🛐", answer: "TRUST", hint: "____ in the Lord with all thine heart" }
+            ];
+            const pick = emojiPool[Math.floor(Math.random() * emojiPool.length)];
+            let fullText = "For God so loved the world...";
+            try {
+                const res = await fetch(`https://bible-api.com/${pick.ref}`);
+                const data = await res.json();
+                fullText = data.text.trim().replace(/\n/g, ' ');
+            } catch(e) {}
+            
+            State.puzzle = {
+                theme: pick.ref,
+                emojis: pick.emojis,
+                answer: pick.answer,
+                hint: pick.hint,
+                fullText: fullText,
+                clues: [{ id: 1, text: pick.hint, answer: pick.answer }]
+            };
+        }
+
+        // ======================================================================
+        // NEW GAME TYPE: BIBLE VERSE BUILDER
+        // ======================================================================
+        async function generateVerseBuilderGame() {
+            const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
+            let text = "In the beginning God created the heaven and the earth";
+            try {
+                const res = await fetch(`https://bible-api.com/${ref}`);
+                const data = await res.json();
+                text = data.text.trim().replace(/[^a-zA-Z\s]/g, '');
+            } catch(e) {}
+            
+            let originalWords = text.split(/\s+/).filter(w => w.length > 0);
+            if(originalWords.length > 14) originalWords = originalWords.slice(0, 14); 
+            
+            let scrambled = originalWords.map((w, i) => ({ word: w, origIdx: i })).sort(() => 0.5 - Math.random());
+            
+            State.puzzle = {
+                theme: ref,
+                fullText: text,
+                originalWords: originalWords,
+                scrambled: scrambled,
+                clues: [{ id: 1, text: "Reconstruct the sequence layout matching the exact dynamic source reference.", answer: originalWords.join(' ').toUpperCase() }]
+            };
+        }
+
+        window.addVbWord = function(idx) {
+            if(!State.inputs['vb-sequence'].includes(idx)) {
+                State.inputs['vb-sequence'].push(idx);
+                renderSVGBoard();
+            }
+        };
+        window.removeVbWord = function(idx) {
+            State.inputs['vb-sequence'] = State.inputs['vb-sequence'].filter(i => i !== idx);
+            renderSVGBoard();
+        };
+        window.clearVbSequence = function() {
+            State.inputs['vb-sequence'] = [];
+            renderSVGBoard();
+        };
 
         // ======================================================================
         // SPOT THE WRONG VERSE GAME ENGINE
@@ -222,9 +297,7 @@
                 { text: "Cleanliness is next to godliness.", ref: "John Wesley Sermon", isFake: true },
                 { text: "Money is the root of all evil.", ref: "Misquote (1 Timothy 6:10)", isFake: true },
                 { text: "This too shall pass.", ref: "Persian Adage", isFake: true },
-                { text: "Hate the sin, love the sinner.", ref: "Augustine / Gandhi concept", isFake: true },
-                { text: "The lion shall lie down with the lamb.", ref: "Misquote (Isaiah 11:6)", isFake: true },
-                { text: "God will not give you more than you can handle.", ref: "Misquote (1 Cor 10:13)", isFake: true }
+                { text: "Hate the sin, love the sinner.", ref: "Augustine / Gandhi concept", isFake: true }
             ];
             const fakeOption = fakePool[Math.floor(Math.random() * fakePool.length)];
             
@@ -233,7 +306,7 @@
         }
 
         // ======================================================================
-        // DYNAMIC API DATA GENERATION (Brick, Row, Radial, Scrabble)
+        // DYNAMIC API DATA GENERATION
         // ======================================================================
         async function generateDynamicPuzzle(shape) {
             const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
@@ -247,7 +320,7 @@
 
             let words = verse.split(/\s+/).filter(w => w.length > 2);
             if (words.length > 10 && shape !== 'scrabble') words = words.slice(0, 10);
-            if (shape === 'scrabble') words = [...new Set(words)]; // unique words for crossword
+            if (shape === 'scrabble') words = [...new Set(words)]; 
 
             let puzzle = { theme: ref, verse: verse, fullText: verse, clues: [] };
 
@@ -275,7 +348,6 @@
                 puzzle.sectors = 12;
             }
             else if (shape === 'scrabble') {
-                // Crossword generator logic
                 let placedWords = [];
                 let board = Array(40).fill(null).map(() => Array(40).fill(null));
                 words.sort((a,b) => b.length - a.length); 
@@ -365,6 +437,10 @@
                 State.puzzle.clues.forEach(c => { for (let i = 0; i < c.answer.length; i++) State.inputs[`r-${c.ring}-${i}`] = (State.difficulty === 'easy' && i === 0) ? c.answer[0] : ''; });
             } else if (State.shape === 'spiral') {
                 State.puzzle.clues.forEach(c => { for (let i = 0; i < c.answer.length; i++) State.inputs[`s-${c.startIdx + i}`] = (State.difficulty === 'easy' && i === 0) ? c.answer[0] : ''; });
+            } else if (State.shape === 'emojiguess') {
+                for (let i = 0; i < State.puzzle.answer.length; i++) State.inputs[`eg-${i}`] = (State.difficulty === 'easy' && i === 0) ? State.puzzle.answer[0] : '';
+            } else if (State.shape === 'versebuilder') {
+                State.inputs['vb-sequence'] = [];
             } else if (State.shape === 'scrabble') {
                 State.puzzle.placedWords.forEach(pw => {
                     for(let i = 0; i < pw.word.length; i++) {
@@ -385,9 +461,6 @@
             renderClues();
         }
 
-        // ======================================================================
-        // INPUT AND RENDERING FOR SVG GAMES
-        // ======================================================================
         function handleCellClick(key) { State.selectedCell = key; renderSVGBoard(); hiddenInput.focus(); }
 
         hiddenInput.addEventListener('input', (e) => {
@@ -403,6 +476,23 @@
                     <div class="p-5 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-900">
                         <p class="text-sm font-medium leading-relaxed">Read the verses carefully. Three of these options are real verses pulled from the Bible API. One is a common misquote or cultural saying that isn't actually scripture.</p>
                         <p class="text-sm font-bold mt-3 uppercase tracking-widest text-indigo-600">Select the fake verse!</p>
+                    </div>
+                `;
+                return;
+            }
+            if (State.shape === 'emojiguess') {
+                document.getElementById('clues-container').innerHTML = `
+                    <div class="p-5 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-900">
+                        <p class="text-xs uppercase font-bold tracking-widest text-indigo-400 mb-1">Clue / Context</p>
+                        <p class="text-sm font-semibold leading-relaxed">"${State.puzzle.hint}"</p>
+                    </div>
+                `;
+                return;
+            }
+            if (State.shape === 'versebuilder') {
+                document.getElementById('clues-container').innerHTML = `
+                    <div class="p-5 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-900">
+                        <p class="text-sm font-medium leading-relaxed">Click words from the pool below in their exact mechanical sequencing configuration to construct the target verse correctly.</p>
                     </div>
                 `;
                 return;
@@ -439,6 +529,54 @@
                     `;
                 });
                 html += '</div>';
+                container.innerHTML = html;
+                return;
+            }
+
+            if (State.shape === 'emojiguess') {
+                let html = `<div class="flex flex-col items-center justify-center space-y-8 w-full py-6">
+                    <div class="text-5xl tracking-widest p-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-inner select-none">${State.puzzle.emojis}</div>
+                    <div class="flex flex-wrap justify-center gap-2">`;
+                for(let i=0; i<State.puzzle.answer.length; i++) {
+                    const key = `eg-${i}`;
+                    const isSel = State.selectedCell === key;
+                    const val = State.inputs[key] || '';
+                    html += `
+                        <div onclick="handleCellClick('${key}')" class="w-12 h-12 rounded-xl border-2 flex items-center justify-center font-bold text-xl cursor-pointer ${isSel ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-2 ring-indigo-200' : 'border-slate-200 bg-white hover:border-slate-300'}">
+                            ${val}
+                        </div>
+                    `;
+                }
+                html += `</div></div>`;
+                container.innerHTML = html;
+                return;
+            }
+
+            if (State.shape === 'versebuilder') {
+                let selectedIndices = State.inputs['vb-sequence'] || [];
+                let html = `<div class="flex flex-col items-center w-full space-y-8 py-4 px-2">
+                    <div class="w-full min-h-[100px] p-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-wrap gap-2 items-center justify-center text-slate-800 font-bold text-lg">
+                        ${selectedIndices.length === 0 ? '<span class="text-slate-400 font-medium text-sm">Click words below to assemble the scripture sequence layout...</span>' : selectedIndices.map(idx => `
+                            <span class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl shadow-sm cursor-pointer hover:bg-indigo-700 transition-colors" onclick="removeVbWord(${idx})">
+                                ${State.puzzle.scrambled[idx].word}
+                            </span>
+                        `).join('')}
+                    </div>
+                    <div class="w-full">
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-center">Available Blocks</span>
+                        <div class="flex flex-wrap justify-center gap-2">`;
+                State.puzzle.scrambled.forEach((item, idx) => {
+                    const isUsed = selectedIndices.includes(idx);
+                    html += `
+                        <button onclick="${isUsed ? 'void(0)' : `addVbWord(${idx})`}" 
+                                class="px-3 py-2 rounded-xl font-semibold border text-sm transition-all ${isUsed ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed scale-95' : 'bg-white border-slate-200 hover:border-indigo-400 text-slate-700 hover:bg-slate-50 active:scale-95 shadow-sm'}">
+                            ${item.word}
+                        </button>
+                    `;
+                });
+                html += `</div></div>
+                <button onclick="clearVbSequence()" class="text-xs font-bold text-rose-500 hover:text-rose-700 uppercase tracking-wider mt-2">Reset Layout</button>
+                </div>`;
                 container.innerHTML = html;
                 return;
             }
@@ -482,7 +620,6 @@
                 svgHTML = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="max-height: 50vh;">${rects}</svg>`;
             }
             else if (State.shape === 'scrabble') {
-                // Find bounds
                 let minR = 40, maxR = 0, minC = 40, maxC = 0;
                 State.puzzle.placedWords.forEach(pw => {
                     if (pw.dir === 'H') {
@@ -502,7 +639,7 @@
                 const startY = (h - (rows * bs)) / 2;
 
                 let rects = '';
-                let drawnCells = {}; // Avoid drawing intersections twice
+                let drawnCells = {}; 
                 
                 State.puzzle.placedWords.forEach(pw => {
                     for (let i = 0; i < pw.word.length; i++) {
@@ -594,7 +731,7 @@
         }
 
         // ======================================================================
-        // GRID GAME ENGINE (Handles Word Search, Square Search, Word Flower)
+        // GRID GAME ENGINE (Word Search configurations)
         // ======================================================================
         async function generateGridGame(shape) {
             const ref = API_VERSE_REFS[Math.floor(Math.random() * API_VERSE_REFS.length)];
@@ -608,23 +745,20 @@
                 const cleanedStr = fetchedText.replace(/[^a-zA-Z\s]/g, '').toUpperCase();
                 generatedWords = [...new Set(cleanedStr.split(/\s+/))];
             } catch (error) {
-                fetchedText = "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.";
-                generatedWords = ["GOD", "LOVE", "WORLD", "SON", "LIFE", "BELIEVE", "PERISH", "ETERNAL", "GRACE", "HOPE", "FAITH", "CROSS", "BLOOD", "MERCY", "PEACE", "SPIRIT", "HOLY", "TRUTH", "LIGHT"];
+                fetchedText = "For God so loved the world...";
+                generatedWords = ["GOD", "LOVE", "WORLD", "SON", "LIFE", "BELIEVE"];
             }
 
             State.ws.apiRef = ref;
             State.ws.apiVerse = fetchedText;
 
             const targetWords = Math.min(100, Math.max(20, 20 + Math.floor((State.level - 1) * 2.75)));
-            
-            // Adjust sizes
             let size = Math.min(40, Math.max(16, Math.floor(Math.sqrt(targetWords * 10)))); 
             if (shape === 'flower') size = Math.floor(size * 1.35);
-            if (shape === 'squaresearch') size = Math.floor(size * 0.85); // Square has more dense area
+            if (shape === 'squaresearch') size = Math.floor(size * 0.85);
 
             State.ws.size = size;
             const center = size / 2 - 0.5;
-            
             let grid = Array(size).fill(null).map(() => Array(size).fill(null));
             
             for (let r=0; r<size; r++) {
@@ -640,7 +774,7 @@
                         const maxDist = (size / 2 - 1) * (0.7 + 0.3 * Math.cos(6 * angle)); 
                         if (dist <= maxDist) grid[r][c] = '';
                     } else if (shape === 'squaresearch') {
-                        grid[r][c] = ''; // Full boundary
+                        grid[r][c] = ''; 
                     }
                 }
             }
@@ -682,7 +816,6 @@
                 }
             });
 
-            // Fill remaining blanks
             const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
             for (let r=0; r<size; r++) {
                 for (let c=0; c<size; c++) {
@@ -762,7 +895,6 @@
                     if (isFound) cls = foundCls;
                     else if (isAnchor) cls = anchorCls;
 
-                    // Make cells square if square search, round otherwise
                     const cellShape = isSquare ? 'rounded-md' : 'rounded-full';
 
                     gridHTML += `<div onclick="wsClick(${r}, ${c})" class="${cellW} flex items-center justify-center font-bold ${cellShape} cursor-pointer transition-all active:scale-90 ${cls}">${char}</div>`;
@@ -795,7 +927,7 @@
         }
 
         // ======================================================================
-        // WIN / SKIP LOGIC
+        // VALIDATION ENGINE
         // ======================================================================
         function showAnswers() {
             State.usedShowAnswers = true;
@@ -806,6 +938,21 @@
             } else if (State.shape === 'spot') {
                 const fakeIdx = State.puzzle.options.findIndex(o => o.isFake);
                 State.inputs['spot'] = fakeIdx;
+                renderSVGBoard();
+                setTimeout(triggerWin, 1500);
+            } else if (State.shape === 'emojiguess') {
+                for (let i = 0; i < State.puzzle.answer.length; i++) {
+                    State.inputs[`eg-${i}`] = State.puzzle.answer[i];
+                }
+                renderSVGBoard();
+                setTimeout(triggerWin, 1500);
+            } else if (State.shape === 'versebuilder') {
+                let seq = [];
+                for(let i=0; i<State.puzzle.originalWords.length; i++) {
+                    let scrIdx = State.puzzle.scrambled.findIndex(item => item.origIdx === i);
+                    seq.push(scrIdx);
+                }
+                State.inputs['vb-sequence'] = seq;
                 renderSVGBoard();
                 setTimeout(triggerWin, 1500);
             } else {
@@ -846,6 +993,21 @@
             if (State.shape === 'spot') {
                 const sel = State.inputs['spot'];
                 if (sel === null || !State.puzzle.options[sel].isFake) isValid = false;
+            } else if (State.shape === 'emojiguess') {
+                for (let i = 0; i < State.puzzle.answer.length; i++) {
+                    if ((State.inputs[`eg-${i}`] || '') !== State.puzzle.answer[i]) isValid = false;
+                }
+            } else if (State.shape === 'versebuilder') {
+                let selectedIndices = State.inputs['vb-sequence'] || [];
+                let userWords = selectedIndices.map(idx => State.puzzle.scrambled[idx].word.toUpperCase());
+                let targetWords = State.puzzle.originalWords.map(w => w.toUpperCase());
+                if (userWords.length !== targetWords.length) {
+                    isValid = false;
+                } else {
+                    for(let i=0; i<targetWords.length; i++) {
+                        if(userWords[i] !== targetWords[i]) isValid = false;
+                    }
+                }
             } else if (State.shape === 'brick') {
                 State.puzzle.grid.forEach(w => {
                     const ans = State.puzzle.clues[w.wordIdx].answer;
@@ -883,7 +1045,7 @@
             if (isValid) triggerWin();
             else {
                 const err = document.getElementById('validation-error');
-                err.innerText = State.shape === 'spot' ? "That is a real verse! Find the one that isn't." : "Some letters are incorrect or missing. Keep trying!";
+                err.innerText = "Some tokens, words, or layout items are incorrect or incomplete. Keep exploring!";
                 err.classList.remove('hidden');
             }
         }
@@ -896,12 +1058,15 @@
             }
 
             document.getElementById('success-level-num').innerText = State.level;
-            if (['wordsearch', 'flower', 'squaresearch'].includes(State.shape)) {
+            if (['wordsearch', 'flower', 'squaresearch', 'versebuilder'].includes(State.shape)) {
                 document.getElementById('success-scripture').classList.add('hidden');
             } else if (State.shape === 'spot') {
                 const fake = State.puzzle.options.find(o => o.isFake);
                 document.getElementById('success-scripture').classList.remove('hidden');
-                document.getElementById('success-verse').innerHTML = `You spotted it!<br><br><span class="text-rose-600">"${fake.text}"</span><br><span class="text-xs font-semibold text-slate-400 uppercase mt-2 block">Source: ${fake.ref}</span>`;
+                document.getElementById('success-verse').innerHTML = `Spotted!<br><br><span class="text-rose-600">"${fake.text}"</span><br><span class="text-xs font-semibold text-slate-400 uppercase mt-2 block">Source: ${fake.ref}</span>`;
+            } else if (State.shape === 'emojiguess') {
+                document.getElementById('success-scripture').classList.remove('hidden');
+                document.getElementById('success-verse').innerHTML = `Decoded: <strong>${State.puzzle.answer}</strong><br><br><span class="text-slate-600 italic">"${State.puzzle.fullText}"</span>`;
             } else {
                 document.getElementById('success-scripture').classList.remove('hidden');
                 document.getElementById('success-verse').innerText = `"${State.puzzle.verse}"`;
