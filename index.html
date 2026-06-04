@@ -31,9 +31,15 @@
             <div class="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white font-bold text-lg group-hover:bg-indigo-600 transition-colors">✝</div>
             <h1 class="text-xl font-bold tracking-tight text-slate-900">Scripture<span class="text-indigo-600">Shapes</span></h1>
         </div>
-        <button id="btn-dashboard" onclick="switchScreen('home')" class="hidden text-sm font-semibold text-slate-500 hover:text-slate-900 px-4 py-2 rounded-full hover:bg-slate-100 transition-all">
-            Dashboard
-        </button>
+        <div class="flex items-center space-x-4">
+            <div id="nav-timer-container" class="hidden flex items-center space-x-2 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100 shadow-sm">
+                <span class="text-sm">⏱️</span>
+                <span id="nav-timer" class="font-mono font-bold text-indigo-700 text-sm">00:00</span>
+            </div>
+            <button id="btn-dashboard" onclick="switchScreen('home')" class="hidden text-sm font-semibold text-slate-500 hover:text-slate-900 px-4 py-2 rounded-full hover:bg-slate-100 transition-all">
+                Dashboard
+            </button>
+        </div>
     </header>
 
     <input type="text" id="hidden-input" class="absolute opacity-0 pointer-events-none w-0 h-0" maxlength="1">
@@ -103,6 +109,18 @@
             <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">✓</div>
             <h2 class="text-3xl font-bold text-slate-900 mb-3">Level <span id="success-level-num"></span> Cleared!</h2>
             
+            <div class="flex items-center justify-center space-x-6 my-6 bg-slate-50 py-3 rounded-2xl border border-slate-100">
+                <div class="text-center">
+                    <span class="block text-[10px] uppercase font-bold tracking-widest text-slate-400">Time</span>
+                    <span id="success-time" class="font-mono font-bold text-lg text-slate-800"></span>
+                </div>
+                <div class="w-px h-8 bg-slate-200"></div>
+                <div class="text-center">
+                    <span class="block text-[10px] uppercase font-bold tracking-widest text-slate-400">Rating</span>
+                    <span id="success-rating" class="font-bold text-xl text-amber-400 tracking-widest"></span>
+                </div>
+            </div>
+            
             <div id="success-scripture" class="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8 mt-6">
                 <span class="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">Decoded Result</span>
                 <p id="success-verse" class="text-slate-800 font-bold leading-relaxed"></p>
@@ -145,7 +163,8 @@
         let State = {
             screen: 'home', shape: '', difficulty: 'easy', level: 1, puzzle: null, inputs: {}, 
             selectedCell: null, selectedClue: null, usedShowAnswers: false,
-            ws: { grid: [], words: [], found: [], startCell: null, size: 5, apiRef: '', apiVerse: '' }
+            ws: { grid: [], words: [], found: [], startCell: null, size: 5, apiRef: '', apiVerse: '' },
+            timerInterval: null, seconds: 0 // <--- Timer State Added
         };
 
         const screens = ['home', 'setup', 'playing', 'success'].map(s => document.getElementById(`screen-${s}`));
@@ -164,6 +183,10 @@
             screens.forEach(s => s.classList.add('hidden'));
             document.getElementById(`screen-${target}`).classList.remove('hidden');
             document.getElementById('btn-dashboard').style.display = target === 'home' ? 'none' : 'block';
+            
+            // Hide the timer if we are leaving the playing screen
+            if (target !== 'playing') stopTimer();
+
             State.screen = target;
         }
 
@@ -181,6 +204,31 @@
 
         function startGame() { State.level = 1; document.getElementById('btn-level-num').innerText = State.level; loadLevel(); }
         function nextLevel() { State.level++; document.getElementById('btn-level-num').innerText = State.level; loadLevel(); }
+
+        // ======================================================================
+        // TIMER ENGINE
+        // ======================================================================
+        function startTimer() {
+            clearInterval(State.timerInterval);
+            State.seconds = 0;
+            updateTimerDisplay();
+            document.getElementById('nav-timer-container').classList.remove('hidden');
+            State.timerInterval = setInterval(() => {
+                State.seconds++;
+                updateTimerDisplay();
+            }, 1000);
+        }
+        
+        function stopTimer() {
+            clearInterval(State.timerInterval);
+            document.getElementById('nav-timer-container').classList.add('hidden');
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(State.seconds / 60).toString().padStart(2, '0');
+            const s = (State.seconds % 60).toString().padStart(2, '0');
+            document.getElementById('nav-timer').innerText = `${m}:${s}`;
+        }
 
         async function loadLevel() {
             switchScreen('playing');
@@ -210,6 +258,9 @@
                 await generateDynamicPuzzle(State.shape);
                 setupSVGGame();
             }
+
+            // Fire the global level timer once generation has finished loading UI
+            startTimer();
         }
 
         // ======================================================================
@@ -1051,6 +1102,8 @@
         }
 
         function triggerWin() {
+            stopTimer(); // Ensure the timer stops the moment they successfully solve it!
+
             if (State.usedShowAnswers) {
                 State.usedShowAnswers = false;
                 loadLevel(); 
@@ -1058,6 +1111,18 @@
             }
 
             document.getElementById('success-level-num').innerText = State.level;
+
+            // Handle Timing and Ratings Output
+            const m = Math.floor(State.seconds / 60).toString().padStart(2, '0');
+            const s = (State.seconds % 60).toString().padStart(2, '0');
+            document.getElementById('success-time').innerText = `${m}:${s}`;
+            
+            let rating = '⭐'; // Over 90s
+            if(State.seconds <= 45) rating = '⭐⭐⭐';
+            else if(State.seconds <= 90) rating = '⭐⭐';
+            document.getElementById('success-rating').innerText = rating;
+
+            // Dynamic Success UI
             if (['wordsearch', 'flower', 'squaresearch', 'versebuilder'].includes(State.shape)) {
                 document.getElementById('success-scripture').classList.add('hidden');
             } else if (State.shape === 'spot') {
